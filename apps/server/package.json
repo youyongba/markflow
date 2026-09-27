@@ -1,0 +1,21 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "NODE_ENV=production node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "next": "^14.2.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "shared-constants": "workspace:*",
+    "shared-types": "workspace:*",
+    "shared-utils": "workspace:*"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "my-app-boilerplate",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter server dev",
+    "start": "pnpm --filter server start",
+    "build": "pnpm -r build"
+  }
+}
