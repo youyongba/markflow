@@ -93,6 +93,26 @@ export const EditorArea = () => {
 
   // 引用 textarea DOM 以获取光标位置
   const textareaRef = useRef(null);
+  
+  // 双向同步滚动相关的 Ref
+  const leftPaneRef = useRef(null);
+  const rightPaneRef = useRef(null);
+  const scrollOriginRef = useRef(null); // 记录当前滚动的发起方: 'left' | 'right'
+
+  // 同步滚动核心逻辑
+  const handleSyncScroll = (source, target) => {
+    if (!isSyncScroll || activeTab !== 'split' || !source || !target) return;
+    
+    const sourceScrollable = source.scrollHeight - source.clientHeight;
+    const targetScrollable = target.scrollHeight - target.clientHeight;
+    
+    // 如果没有可滚动的空间，则直接返回
+    if (sourceScrollable <= 0 || targetScrollable <= 0) return;
+    
+    // 计算滚动比例并应用到目标容器
+    const percentage = source.scrollTop / sourceScrollable;
+    target.scrollTop = percentage * targetScrollable;
+  };
 
   // 初始化拉取文档源码
   useEffect(() => {
@@ -441,7 +461,17 @@ export const EditorArea = () => {
               </div>
               <div>Ln {lineCount}, Col {sourceCode.length} &nbsp;&nbsp; LF &nbsp;&nbsp; UTF-8</div>
             </div>
-            <div className={styles.paneContent} style={{ display: 'flex', backgroundColor: '#fdfdfd', position: 'relative', padding: 0 }}>
+            <div 
+              className={styles.paneContent} 
+              style={{ display: 'flex', backgroundColor: '#fdfdfd', position: 'relative', padding: 0 }}
+              ref={leftPaneRef}
+              onMouseEnter={() => { scrollOriginRef.current = 'left'; }}
+              onScroll={(e) => {
+                if (scrollOriginRef.current === 'left') {
+                  handleSyncScroll(e.target, rightPaneRef.current);
+                }
+              }}
+            >
               
               {/* 行号栏 */}
               <div style={{ padding: '16px 8px', backgroundColor: '#f8fafc', borderRight: '1px solid #e2e8f0', color: '#94a3b8', fontSize: 13, fontFamily: 'monospace', textAlign: 'right', userSelect: 'none', minWidth: 40 }}>
@@ -513,7 +543,16 @@ export const EditorArea = () => {
                 阅读宽度: 800px 最佳视野
               </div>
             </div>
-            <div className={styles.paneContent}>
+            <div 
+              className={styles.paneContent}
+              ref={rightPaneRef}
+              onMouseEnter={() => { scrollOriginRef.current = 'right'; }}
+              onScroll={(e) => {
+                if (scrollOriginRef.current === 'right') {
+                  handleSyncScroll(e.target, leftPaneRef.current);
+                }
+              }}
+            >
               <div className={styles.previewContent}>
                 <div style={{ borderBottom: '1px solid #dce9ff', paddingBottom: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
