@@ -3,6 +3,8 @@ import { createSlice } from '@reduxjs/toolkit';
 const initialState = {
   isLeftSidebarOpen: true,
   isRightSidebarOpen: true,
+  activeNavItem: 'files',
+  expandedNodes: ['doc-space', 'architecture', 'api-specs', 'bookmarks'],
   activeDocument: {
     title: 'ADR-004-分布式存储架构与高可用设计',
     status: 'In-Review',
@@ -13,6 +15,10 @@ const initialState = {
   },
   activeTab: 'source', // 'source', 'split', 'preview'
   isSyncScroll: true,
+  treeNodes: [], // 扁平化目录树数据
+  bookmarks: [], // 书签数据
+  filesCount: 0,
+  tagsCount: 0,
 };
 
 export const layoutSlice = createSlice({
@@ -25,17 +31,51 @@ export const layoutSlice = createSlice({
     toggleRightSidebar: (state) => {
       state.isRightSidebarOpen = !state.isRightSidebarOpen;
     },
+    setActiveNavItem: (state, action) => {
+      state.activeNavItem = action.payload;
+    },
+    toggleNodeExpansion: (state, action) => {
+      const nodeId = action.payload;
+      if (state.expandedNodes.includes(nodeId)) {
+        state.expandedNodes = state.expandedNodes.filter(id => id !== nodeId);
+      } else {
+        state.expandedNodes.push(nodeId);
+      }
+    },
     setActiveTab: (state, action) => {
       state.activeTab = action.payload;
     },
     toggleSyncScroll: (state) => {
       state.isSyncScroll = !state.isSyncScroll;
     },
+    setPreferences: (state, action) => {
+      const { activeNavItem, expandedNodes, isLeftSidebarOpen, filesCount, tagsCount } = action.payload;
+      if (activeNavItem !== undefined) state.activeNavItem = activeNavItem;
+      if (expandedNodes !== undefined) state.expandedNodes = expandedNodes;
+      if (isLeftSidebarOpen !== undefined) state.isLeftSidebarOpen = isLeftSidebarOpen;
+      if (filesCount !== undefined) state.filesCount = filesCount;
+      if (tagsCount !== undefined) state.tagsCount = tagsCount;
+    },
+    setTreeNodes: (state, action) => {
+      state.treeNodes = action.payload;
+    },
+    addTreeNodes: (state, action) => {
+      const newNodes = action.payload.filter(
+        newNode => !state.treeNodes.some(existing => existing.id === newNode.id)
+      );
+      state.treeNodes = [...state.treeNodes, ...newNodes];
+    },
+    setBookmarks: (state, action) => {
+      state.bookmarks = action.payload;
+    },
     updateDocumentTitle: (state, action) => {
       state.activeDocument.title = action.payload;
     },
     updateDocumentStatus: (state, action) => {
       state.activeDocument.status = action.payload;
+    },
+    setActiveDocument: (state, action) => {
+      state.activeDocument = { ...state.activeDocument, ...action.payload };
     },
     addDocumentTag: (state, action) => {
       if (!state.activeDocument.tags.includes(action.payload)) {
@@ -53,12 +93,19 @@ export const layoutSlice = createSlice({
 export const {
   toggleLeftSidebar,
   toggleRightSidebar,
+  setActiveNavItem,
+  toggleNodeExpansion,
   setActiveTab,
   toggleSyncScroll,
+  setPreferences,
+  setTreeNodes,
+  addTreeNodes,
+  setBookmarks,
   updateDocumentTitle,
   updateDocumentStatus,
+  setActiveDocument,
   addDocumentTag,
-  removeDocumentTag,
+  removeDocumentTag
 } = layoutSlice.actions;
 
 export default layoutSlice.reducer;

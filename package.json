@@ -3,8 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm --filter server dev",
-    "start": "pnpm --filter server start",
-    "build": "pnpm -r build"
+    "dev": "dotenv -e .env.development -- pnpm --filter server dev",
+    "dev:mock": "dotenv -e .env.mock -- pnpm --filter server dev",
+    "build": "dotenv -e .env.production -- pnpm -r build",
+    "build:test": "dotenv -e .env.test -- pnpm -r build",
+    "start": "dotenv -e .env.production -- pnpm --filter server start",
+    "start:test": "dotenv -e .env.test -- pnpm --filter server start"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0",
+    "dotenv-cli": "^11.0.0"
   }
 }

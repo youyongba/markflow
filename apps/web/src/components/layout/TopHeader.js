@@ -1,33 +1,359 @@
-import React from 'react';
-import { Folder, Search, Share, Plus, ChevronDown } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { Folder, Search, Share, Plus, ChevronDown, AlignLeft, X, FileText, CheckCircle, Sparkles } from 'lucide-react';
 import styles from '../../pages/index.module.css';
+import { toggleLeftSidebar } from '../../store/slices/layoutSlice';
+import * as api from '../../services/api/header';
 
 export const TopHeader = () => {
+  const dispatch = useDispatch();
+  const { isLeftSidebarOpen } = useSelector((state) => state.layout);
+
+  const [headerContext, setHeaderContext] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
+  
+  // 搜索相关状态
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  
+  // 新建文档弹窗状态
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [docTitle, setDocTitle] = useState('ADR-005-分布式元数据同步方案.md');
+  const [docDirectory, setDocDirectory] = useState('architecture');
+  const [frontmatter, setFrontmatter] = useState('standard');
+  const [templateId, setTemplateId] = useState('adr');
+  const [enableAi, setEnableAi] = useState(true);
+  const [aiPrompt, setAiPrompt] = useState('针对跨区域混合云部署的元数据 Raft 复制与分片路由方案设计');
+
+  const handleFormatMD = () => {
+    if (docTitle && !docTitle.toLowerCase().endsWith('.md')) {
+      setDocTitle(prev => prev + '.md');
+    }
+  };
+
+  // 初始化拉取顶部上下文和用户信息
+  useEffect(() => {
+    api.fetchContext().then(res => {
+      if (res.code === 200) setHeaderContext(res.data);
+    }).catch(err => console.error('Failed to fetch header context', err));
+
+    api.fetchUserProfile().then(res => {
+      if (res.code === 200) setUserProfile(res.data);
+    }).catch(err => console.error('Failed to fetch user profile', err));
+  }, []);
+
+  // 生成分享链接交互
+  const handleShare = async () => {
+    try {
+      const res = await api.createShareLink({ targetId: 'doc_current', expiresIn: 86400 });
+      if (res.code === 200 && res.data) {
+        alert(`分享链接已生成:\n${res.data.shareUrl}`);
+      }
+    } catch (err) {
+      console.error('Share failed', err);
+    }
+  };
+
+  // 打开新建文档弹窗
+  const handleCreateDoc = () => setIsCreateModalOpen(true);
+
+  // 确认创建文档
+  const handleConfirmCreate = async () => {
+    try {
+      const payload = {
+        title: docTitle || '无标题文档',
+        parentId: docDirectory,
+        frontmatter: frontmatter,
+        templateId: templateId,
+        enableAi: enableAi,
+        aiPrompt: enableAi ? aiPrompt : undefined
+      };
+      const res = await api.createDocument(payload);
+      if (res.code === 200 && res.data) {
+        alert(`新建文档成功！文档 ID: ${res.data.documentId}\n\n请求参数:\n${JSON.stringify(payload, null, 2)}`);
+        setIsCreateModalOpen(false);
+      }
+    } catch (err) {
+      console.error('Create doc failed', err);
+    }
+  };
+
+  // 监听弹窗快捷键 (Esc取消, Enter创建)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (!isCreateModalOpen) return;
+      if (e.key === 'Escape') setIsCreateModalOpen(false);
+      if (e.key === 'Enter') handleConfirmCreate();
+    };
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    return () => document.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [isCreateModalOpen]);
+
+  // 处理搜索输入和回车
+  const handleSearchKeyDown = async (e) => {
+    if (e.key === 'Enter' && searchKeyword.trim()) {
+      setIsSearching(true);
+      setIsSearchOpen(true);
+      try {
+        const res = await api.searchGlobal(searchKeyword.trim());
+        if (res.code === 200) {
+          setSearchResults(res.data || []);
+        }
+      } catch (err) {
+        console.error('Search failed', err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }
+  };
+
+  // 关闭搜索弹窗
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest(`.${styles.searchBar}`)) {
+        setIsSearchOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  // 渲染动态面包屑
+  const renderBreadcrumbText = () => {
+    if (!headerContext) return 'Loading...';
+    const parts = [
+      headerContext.workspaceName,
+      headerContext.branchOrTag,
+      ...(headerContext.paths?.map(p => p.title) || [])
+    ].filter(Boolean);
+    return parts.join(' / ');
+  };
+
   return (
     <div className={styles.topHeader}>
       <div className={styles.breadcrumb}>
+        {!isLeftSidebarOpen && (
+          <AlignLeft 
+            size={18} 
+            color="#64748b" 
+            style={{ cursor: 'pointer', marginRight: '12px' }} 
+            onClick={() => dispatch(toggleLeftSidebar())} 
+          />
+        )}
         <Folder size={16} color="#3b82f6" />
-        <span>Engineering Wiki / main</span>
+        <span>{renderBreadcrumbText()}</span>
         <ChevronDown size={14} />
       </div>
 
-      <div className={styles.searchBar}>
+      <div className={styles.searchBar} style={{ position: 'relative' }}>
         <Search size={14} />
-        <input type="text" placeholder="搜索文档、标签、代码片段..." />
+        <input 
+          type="text" 
+          placeholder="搜索文档、标签、代码片段... (按回车搜索)" 
+          value={searchKeyword}
+          onChange={(e) => setSearchKeyword(e.target.value)}
+          onKeyDown={handleSearchKeyDown}
+          onFocus={() => { if (searchResults.length > 0) setIsSearchOpen(true); }}
+        />
         <span className={styles.searchShortcut}>⌘K</span>
+
+        {/* 搜索结果下拉框 */}
+        {isSearchOpen && (
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            marginTop: '8px',
+            backgroundColor: 'white',
+            border: '1px solid #e2e8f0',
+            borderRadius: '6px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            zIndex: 50,
+            maxHeight: '300px',
+            overflowY: 'auto'
+          }}>
+            {isSearching ? (
+              <div style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>搜索中...</div>
+            ) : searchResults.length > 0 ? (
+              searchResults.map(item => (
+                <div key={item.id} style={{ 
+                  padding: '10px 12px', 
+                  borderBottom: '1px solid #f1f5f9',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px'
+                }}
+                onClick={() => {
+                  alert(`即将跳转至: ${item.url}`);
+                  setIsSearchOpen(false);
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '500', color: '#0f172a' }}>{item.title}</span>
+                    <span style={{ fontSize: '11px', color: '#94a3b8', backgroundColor: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
+                      {item.type}
+                    </span>
+                  </div>
+                  {item.highlight && (
+                    <div 
+                      style={{ fontSize: '12px', color: '#64748b', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                      dangerouslySetInnerHTML={{ __html: item.highlight }} 
+                    />
+                  )}
+                </div>
+              ))
+            ) : (
+              <div style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>未找到相关结果</div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className={styles.headerActions}>
-        <div className={styles.actionBtn}>
+        <div className={styles.actionBtn} onClick={handleShare} style={{ cursor: 'pointer' }}>
           <Share size={14} /> 分享
         </div>
-        <div className={`${styles.actionBtn} ${styles.btnPrimary}`}>
+        <div className={`${styles.actionBtn} ${styles.btnPrimary}`} onClick={handleCreateDoc} style={{ cursor: 'pointer' }}>
           <Plus size={14} /> 新建文档
         </div>
         <div className={styles.avatar}>
-          <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" width="28" height="28" />
+          {userProfile ? (
+            <img 
+              src={userProfile.avatarUrl} 
+              alt={userProfile.userName} 
+              title={`${userProfile.userName} (${userProfile.role})`}
+              width="28" 
+              height="28" 
+              style={{ borderRadius: '50%' }}
+            />
+          ) : (
+            <div style={{ width: 28, height: 28, backgroundColor: '#e2e8f0', borderRadius: '50%' }} />
+          )}
         </div>
       </div>
+
+      {/* 新建文档弹窗 (浮层) */}
+      {isCreateModalOpen && (
+        <div style={{ position:'fixed', inset:0, backgroundColor:'rgba(15,23,42,0.5)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
+          <div style={{ backgroundColor:'#fff', borderRadius:'12px', width:'90%', maxWidth:'640px', boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+            {/* 弹窗 Header */}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'16px 20px', borderBottom:'1px solid #e2e8f0' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+                <div style={{ width:32, height:32, backgroundColor:'#eff6ff', color:'#3b82f6', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center' }}><FileText size={18} /></div>
+                <div>
+                  <div style={{ fontSize:16, fontWeight:600, color:'#0f172a' }}>新建文档</div>
+                  <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>Create New Document · Markdown + YAML 元数据</div>
+                </div>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                <span style={{ fontSize:11, color:'#64748b', backgroundColor:'#f1f5f9', padding:'2px 6px', borderRadius:4 }}>Esc</span>
+                <X size={18} color="#94a3b8" style={{ cursor:'pointer' }} onClick={() => setIsCreateModalOpen(false)} />
+              </div>
+            </div>
+
+            {/* 弹窗 Body */}
+            <div style={{ padding:'20px', display:'flex', flexDirection:'column', gap:'20px' }}>
+              <div>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8, fontSize:12, fontWeight:500, color:'#475569' }}>
+                  <span>文档名称与后缀 (TITLE)</span><span style={{ color:'#3b82f6', cursor:'pointer' }} onClick={handleFormatMD}>自动格式化 .MD</span>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', border: docTitle ? '1px solid #3b82f6' : '1px solid #e2e8f0', borderRadius:6, padding:'8px 12px', boxShadow: docTitle ? '0 0 0 2px rgba(59,130,246,0.1)' : 'none' }}>
+                  <FileText size={16} color="#94a3b8" style={{ marginRight:8 }} />
+                  <input type="text" value={docTitle} onChange={e => setDocTitle(e.target.value)} placeholder="请输入文档名称..." style={{ flex:1, border:'none', outline:'none', fontSize:13, color:'#0f172a', backgroundColor:'transparent' }} />
+                  <span style={{ fontSize:11, color:'#64748b', backgroundColor:'#f1f5f9', padding:'2px 6px', borderRadius:4 }}>UTF-8</span>
+                </div>
+              </div>
+
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
+                <div>
+                  <div style={{ marginBottom:8, fontSize:12, fontWeight:500, color:'#475569' }}>存储目录 (DIRECTORY PATH)</div>
+                  <div style={{ display:'flex', alignItems:'center', position:'relative', border:'1px solid #e2e8f0', borderRadius:6, backgroundColor:'#f8fafc' }}>
+                    <Folder size={14} color="#64748b" style={{ position:'absolute', left:12 }} />
+                    <select value={docDirectory} onChange={e => setDocDirectory(e.target.value)} style={{ width:'100%', appearance:'none', border:'none', backgroundColor:'transparent', padding:'8px 32px', fontSize:13, color:'#334155', outline:'none', cursor:'pointer' }}>
+                      <option value="architecture">架构设计 (Architecture)/</option>
+                      <option value="devops">运维手册 (DevOps)/</option>
+                      <option value="root">根目录 (Root)/</option>
+                    </select>
+                    <ChevronDown size={14} color="#94a3b8" style={{ position:'absolute', right:12, pointerEvents:'none' }} />
+                  </div>
+                </div>
+                <div>
+                  <div style={{ marginBottom:8, fontSize:12, fontWeight:500, color:'#475569' }}>FRONTMATTER 元数据预设</div>
+                  <div style={{ display:'flex', alignItems:'center', position:'relative', border:'1px solid #e2e8f0', borderRadius:6, backgroundColor:'#f8fafc' }}>
+                    <select value={frontmatter} onChange={e => setFrontmatter(e.target.value)} style={{ width:'100%', appearance:'none', border:'none', backgroundColor:'transparent', padding:'8px 32px 8px 12px', fontSize:13, color:'#334155', outline:'none', cursor:'pointer' }}>
+                      <option value="standard">标准工程 YAML (Title, Status, Tags, Author)</option>
+                      <option value="minimal">极简 YAML (Title, Date)</option>
+                      <option value="none">不启用 Frontmatter</option>
+                    </select>
+                    <ChevronDown size={14} color="#94a3b8" style={{ position:'absolute', right:12, pointerEvents:'none' }} />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8, fontSize:12, fontWeight:500, color:'#475569' }}>
+                  <span>选择模板预设 (TEMPLATE PRESETS)</span><span style={{ color:'#3b82f6', cursor:'pointer' }}>管理团队模板库</span>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' }}>
+                  {[
+                    { id: 'blank', title: '空白文档 (Blank)', desc: '纯净起步，自由编写标准 Markdown', Icon: FileText },
+                    { id: 'adr', title: 'ADR 架构决策记录', desc: '含决策背景、多方案比对矩阵与落地清单', Icon: CheckCircle, tag: '推荐' },
+                    { id: 'rfc', title: 'RFC 技术方案规范', desc: '规范征询提案、API变更及灰度放量计划', Icon: Share },
+                    { id: 'api', title: 'API 接口设计定义', desc: 'OpenAPI / REST 协议格式及 cURL 用例', Icon: AlignLeft }
+                  ].map(tpl => {
+                    const isActive = templateId === tpl.id;
+                    return (
+                      <div key={tpl.id} onClick={() => setTemplateId(tpl.id)} style={{ border: isActive ? '1px solid #3b82f6' : '1px solid #e2e8f0', backgroundColor: isActive ? '#eff6ff' : '#fff', borderRadius:8, padding:12, position:'relative', cursor:'pointer' }}>
+                        {isActive && <div style={{ position:'absolute', top:10, right:10 }}><CheckCircle size={16} color="#3b82f6" /></div>}
+                        <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                          <tpl.Icon size={14} color={isActive ? '#3b82f6' : '#64748b'} />
+                          <span style={{ fontSize:13, fontWeight:600, color:'#1e293b' }}>{tpl.title}</span>
+                          {tpl.tag && <span style={{ fontSize:10, color:'#fff', backgroundColor:'#3b82f6', padding:'2px 4px', borderRadius:4, transform:'scale(0.9)' }}>{tpl.tag}</span>}
+                        </div>
+                        <div style={{ fontSize:11, color:'#64748b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', paddingRight: isActive ? 20 : 0 }}>{tpl.desc}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ border: enableAi ? '1px solid #d8b4fe' : '1px solid #e2e8f0', backgroundColor: enableAi ? '#faf5ff' : '#f8fafc', borderRadius:8, padding:12 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <input type="checkbox" checked={enableAi} onChange={e => setEnableAi(e.target.checked)} style={{ accentColor:'#a855f7', width:14, height:14, cursor:'pointer' }} />
+                    <Sparkles size={14} color={enableAi ? "#a855f7" : "#94a3b8"} /><span style={{ fontSize:13, fontWeight:600, color: enableAi ? '#0f172a' : '#64748b' }}>启用 AI 智能生成框架大纲 (AI Outline Scaffolding)</span>
+                  </div>
+                  {enableAi && <span style={{ fontSize:10, color:'#fff', backgroundColor:'#a855f7', padding:'2px 6px', borderRadius:4 }}>Claude 3.5</span>}
+                </div>
+                <input type="text" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} disabled={!enableAi} placeholder="请输入大纲生成提示词..." style={{ width:'100%', border: enableAi ? '1px solid #e9d5ff' : '1px solid #e2e8f0', backgroundColor: enableAi ? '#fff' : '#f1f5f9', borderRadius:6, padding:'8px 12px', fontSize:12, color:'#475569', outline:'none', cursor: enableAi ? 'text' : 'not-allowed' }} />
+              </div>
+            </div>
+
+            {/* 弹窗 Footer */}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 20px', backgroundColor:'#f8fafc', borderTop:'1px solid #e2e8f0' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'#64748b' }}>
+                <Folder size={14} color="#eab308" style={{ flexShrink: 0 }} />
+                <span style={{ maxWidth: 320, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`/${docDirectory === 'architecture' ? '架构设计 (Architecture)' : docDirectory === 'devops' ? '运维手册 (DevOps)' : '根目录 (Root)'}/${docTitle || '无标题文档'}`}>
+                  保存至: /{docDirectory === 'architecture' ? '架构设计 (Architecture)' : docDirectory === 'devops' ? '运维手册 (DevOps)' : '根目录 (Root)'}/{docTitle || '无标题文档'}
+                </span>
+              </div>
+              <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+                <button onClick={() => setIsCreateModalOpen(false)} style={{ border:'none', backgroundColor:'transparent', fontSize:13, color:'#64748b', cursor:'pointer' }}>取消 (Esc)</button>
+                <button onClick={handleConfirmCreate} style={{ border:'none', backgroundColor:'#3b82f6', color:'#fff', fontSize:13, fontWeight:500, borderRadius:6, padding:'8px 16px', display:'flex', alignItems:'center', gap:6, cursor:'pointer', boxShadow:'0 1px 2px rgba(0,0,0,0.05)' }}>
+                  <Plus size={14} /> 立即创建 (Enter ↵)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

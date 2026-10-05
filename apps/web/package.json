@@ -12,9 +12,13 @@
     "@reduxjs/toolkit": "^2.0.0",
     "lucide-react": "^1.39.0",
     "next": "^14.2.3",
+    "prismjs": "^1.29.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-markdown": "^9.0.1",
     "react-redux": "^9.0.0",
+    "react-simple-code-editor": "^0.13.1",
+    "remark-gfm": "^4.0.0",
     "shared-constants": "workspace:*",
     "shared-types": "workspace:*",
     "shared-utils": "workspace:*"
