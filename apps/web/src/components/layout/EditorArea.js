@@ -267,10 +267,86 @@ export const EditorArea = () => {
   const handleExport = async (format) => {
     setIsExporting(true);
     setShowExportMenu(false);
+    
     try {
-      const res = await api.exportDocument(currentDocId, format, true);
-      if (res.code === 200 && res.data?.downloadUrl) {
-        alert(`导出成功！下载链接: ${res.data.downloadUrl}`);
+      const title = activeDocument?.title ? activeDocument.title.replace('.md', '') : 'Document';
+      
+      if (format === 'markdown') {
+        // 1. 导出纯 Markdown 文件
+        const blob = new Blob([sourceCode], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${title}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else if (format === 'html' || format === 'pdf') {
+        // 2 & 3. 导出 HTML 和 PDF (抓取右侧渲染好的 DOM 节点并注入离线样式)
+        const previewNode = document.querySelector('.markdown-body');
+        if (!previewNode) {
+          alert('请先切换到包含“实时排版预览”的分屏模式，以获取渲染内容');
+          setIsExporting(false);
+          return;
+        }
+        
+        const htmlContent = previewNode.innerHTML;
+        const fullHtml = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${title}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; color: #1f2937; line-height: 1.6; }
+  h1 { font-size: 32px; margin-bottom: 24px; color: #0b1c30; }
+  h2 { display: flex; align-items: center; gap: 8px; font-size: 20px; margin-top: 32px; margin-bottom: 16px; color: #0b1c30; }
+  table { width: 100%; border-collapse: collapse; margin: 24px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+  th, td { padding: 14px 16px; text-align: left; }
+  th { background-color: #f8fafc; font-weight: 600; text-transform: uppercase; font-size: 14px; color: #1e293b; border-bottom: 1px solid #e2e8f0; }
+  td { border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+  tr:last-child td { border-bottom: none; }
+  blockquote { position: relative; border-left: 4px solid #b45309; margin: 24px 0; padding: 16px 20px; background-color: #fdf6ef; border-radius: 0 8px 8px 0; }
+  pre { background-color: #ffffff; padding: 16px; overflow-x: auto; border-radius: 4px; border: 1px solid #dce9ff; font-family: ui-monospace, monospace; font-size: 13.5px; }
+  .table-wrapper { overflow-x: auto; }
+  @media print {
+    body { padding: 0; max-width: 100%; }
+    .table-wrapper { overflow: visible; }
+  }
+</style>
+</head>
+<body>
+  <h1>${title}</h1>
+  <div class="markdown-body">
+    ${htmlContent}
+  </div>
+</body>
+</html>`;
+
+        if (format === 'html') {
+          // 导出单文件 HTML 包
+          const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${title}.html`;
+          a.click();
+          URL.revokeObjectURL(url);
+        } else if (format === 'pdf') {
+          // 调用浏览器原生打印服务导出 PDF
+          const printWindow = window.open('', '_blank');
+          if (printWindow) {
+            printWindow.document.write(fullHtml);
+            printWindow.document.close();
+            printWindow.onload = () => {
+              setTimeout(() => {
+                printWindow.print();
+                // 打印对话框关闭后自动关闭临时标签页
+                printWindow.onafterprint = () => printWindow.close();
+              }, 200);
+            };
+          } else {
+            alert('请允许浏览器弹出窗口以生成 PDF');
+          }
+        }
       }
     } catch (err) {
       console.error('Export failed', err);
