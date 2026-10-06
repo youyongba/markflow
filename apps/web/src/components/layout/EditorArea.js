@@ -30,49 +30,7 @@ export const EditorArea = () => {
   const currentDocId = 'doc_101'; // 假设当前正在编辑的文档 ID
 
   // 1. 文档源码状态
-  const [sourceCode, setSourceCode] = useState([
-    "> 生产环境高可用核心红线准则",
-    "> ",
-    "> 注意：存储网关与底层纠删码存储池必须部署于跨可用区（Multi-AZ）硬件机柜，核心元数据同步通道严禁共用业务公网，务必配置专用私有链路保证 RTT < 2ms。",
-    "",
-    "## 1. 选型评估决策矩阵 (Comparison Matrix)",
-    "",
-    "针对当前平台日益增长的大型工程模型资产与 Git LFS 仓库二进制大文件存储需求，技术委员会对业界主流存储引擎进行了多维度指标压测对比：",
-    "",
-    "| 评估维度 | MinIO 分布式集群 | Ceph RADOS | 公有云 S3 原生 |",
-    "| --- | --- | --- | --- |",
-    "| **S3 API 兼容度** | 99.8% (近乎原生) | 92.0% (RGW网关) | 100% (标准定义) |",
-    "| **运维复杂度** | 低 (单二进制部署) | 高 (需专业存储运维) | 极低 (全托管免运维) |",
-    "| **内网传输性能** | 1.4 GB/s (4x 25G 网卡) | 1.1 GB/s | 受限于云专线带宽 |",
-    "| **私有化合规** | 完全自控 (AGPLv3) | 完全自控 (LGPL) | 数据出境审查风险 |",
-    "",
-    "## 2. 核心探测节点探针代码 (Go 1.22)",
-    "```go",
-    "package main",
-    "",
-    "import (",
-    "  \"context\"",
-    "  \"github.com/minio/minio-go/v7\"",
-    ")",
-    "",
-    "// VerifyClusterHealth 探测双AZ存储端点实时健康心跳",
-    "func VerifyClusterHealth(endpoint string) bool {",
-    "  ctx := context.Background()",
-    "  client, err := minio.New(endpoint, &minio.Options{Secure: true})",
-    "  if err != nil {",
-    "    return false",
-    "  }",
-    "  return client.IsOnline(ctx)",
-    "}",
-    "```",
-    "",
-    "## 3. 落地推进计划与检查清单 (Action Items)",
-    "",
-    "- [x] [已完成] 完成双可用区专网物理专线链路延迟压测 (均值 1.2ms)",
-    "- [x] [已完成] 验证 Git LFS 客户端 4GB 大文件断点续传能力",
-    "- [ ] [待执行] 完成生产灰度集群跨区仲裁 Raft 演练",
-    "- [ ] [待执行] 对接中央审计平台自动化日志审计管道"
-  ].join('\n'));
+  const [sourceCode, setSourceCode] = useState('');
 
   // 2. 自动保存状态
   const [lastSavedAt, setLastSavedAt] = useState('');
@@ -118,55 +76,7 @@ export const EditorArea = () => {
   useEffect(() => {
     api.fetchContent(currentDocId).then(res => {
       if (res.code === 200 && res.data) {
-        // 如果是从真实接口返回的内容，包含我们刚才写的HTML，则直接使用
-        // 但如果返回的是旧的死数据，为了预览效果，我们强制覆盖为视觉稿表格
-        let fetchedSource = res.data.source;
-        if (!fetchedSource.includes("Comparison Matrix")) {
-            fetchedSource = [
-              "> 生产环境高可用核心红线准则",
-              "> ",
-              "> 注意：存储网关与底层纠删码存储池必须部署于跨可用区（Multi-AZ）硬件机柜，核心元数据同步通道严禁共用业务公网，务必配置专用私有链路保证 RTT < 2ms。",
-              "",
-              "## 1. 选型评估决策矩阵 (Comparison Matrix)",
-              "",
-              "针对当前平台日益增长的大型工程模型资产与 Git LFS 仓库二进制大文件存储需求，技术委员会对业界主流存储引擎进行了多维度指标压测对比：",
-              "",
-              "| 评估维度 | MinIO 分布式集群 | Ceph RADOS | 公有云 S3 原生 |",
-              "| --- | --- | --- | --- |",
-              "| **S3 API 兼容度** | 99.8% (近乎原生) | 92.0% (RGW网关) | 100% (标准定义) |",
-              "| **运维复杂度** | 低 (单二进制部署) | 高 (需专业存储运维) | 极低 (全托管免运维) |",
-              "| **内网传输性能** | 1.4 GB/s (4x 25G 网卡) | 1.1 GB/s | 受限于云专线带宽 |",
-              "| **私有化合规** | 完全自控 (AGPLv3) | 完全自控 (LGPL) | 数据出境审查风险 |",
-              "",
-              "## 2. 核心探测节点探针代码 (Go 1.22)",
-              "```go",
-              "package main",
-              "",
-              "import (",
-              "  \"context\"",
-              "  \"github.com/minio/minio-go/v7\"",
-              ")",
-              "",
-              "// VerifyClusterHealth 探测双AZ存储端点实时健康心跳",
-              "func VerifyClusterHealth(endpoint string) bool {",
-              "  ctx := context.Background()",
-              "  client, err := minio.New(endpoint, &minio.Options{Secure: true})",
-              "  if err != nil {",
-              "    return false",
-              "  }",
-              "  return client.IsOnline(ctx)",
-              "}",
-              "```",
-              "",
-              "## 3. 落地推进计划与检查清单 (Action Items)",
-              "",
-              "- [x] [已完成] 完成双可用区专网物理专线链路延迟压测 (均值 1.2ms)",
-              "- [x] [已完成] 验证 Git LFS 客户端 4GB 大文件断点续传能力",
-              "- [ ] [待执行] 完成生产灰度集群跨区仲裁 Raft 演练",
-              "- [ ] [待执行] 对接中央审计平台自动化日志审计管道"
-            ].join('\n');
-        }
-        setSourceCode(fetchedSource);
+        setSourceCode(res.data.source || '');
         
         if (res.data.lastSavedAt) {
           const date = new Date(res.data.lastSavedAt);

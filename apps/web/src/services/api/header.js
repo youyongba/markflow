@@ -42,6 +42,16 @@ export const createDocument = async (data) => {
   return res.json();
 };
 
+export const createApiTemplateDocument = async (data) => {
+  const baseUrl = getBaseUrl();
+  const res = await fetch(`${baseUrl}/document/api-template`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return res.json();
+};
+
 export const searchGlobal = async (keyword, type = 'all', limit = 10) => {
   const baseUrl = getBaseUrl();
   const url = new URL(`${baseUrl}/search`);

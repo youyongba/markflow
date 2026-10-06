@@ -20,6 +20,7 @@ export const TopHeader = () => {
   
   // 新建文档弹窗状态
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [docTitle, setDocTitle] = useState('ADR-005-分布式元数据同步方案.md');
   const [docDirectory, setDocDirectory] = useState('architecture');
   const [frontmatter, setFrontmatter] = useState('standard');
@@ -61,22 +62,47 @@ export const TopHeader = () => {
 
   // 确认创建文档
   const handleConfirmCreate = async () => {
+    if (isCreating) return;
+    setIsCreating(true);
     try {
-      const payload = {
-        title: docTitle || '无标题文档',
-        parentId: docDirectory,
-        frontmatter: frontmatter,
-        templateId: templateId,
-        enableAi: enableAi,
-        aiPrompt: enableAi ? aiPrompt : undefined
-      };
-      const res = await api.createDocument(payload);
-      if (res.code === 200 && res.data) {
-        alert(`新建文档成功！文档 ID: ${res.data.documentId}\n\n请求参数:\n${JSON.stringify(payload, null, 2)}`);
-        setIsCreateModalOpen(false);
+      if (templateId === 'api' && enableAi) {
+        // 调用专用的新建 REST API 模板接口
+        const payload = {
+          title: docTitle || '无标题文档',
+          parentId: docDirectory,
+          apiDescription: aiPrompt,
+          apiType: 'rest'
+        };
+        const res = await api.createApiTemplateDocument(payload);
+        if (res.code === 200 && res.data) {
+          alert(`API 接口文档生成成功！\n文档 ID: ${res.data.documentId}\n\nAI 生成内容预览:\n${res.data.source.substring(0, 100)}...`);
+          setIsCreateModalOpen(false);
+        } else {
+          alert(`生成失败: ${res.message || '未知错误'}`);
+        }
+      } else {
+        // 调用通用的新建文档接口
+        const payload = {
+          title: docTitle || '无标题文档',
+          parentId: docDirectory,
+          frontmatter: frontmatter,
+          templateId: templateId,
+          enableAi: enableAi,
+          aiPrompt: enableAi ? aiPrompt : undefined
+        };
+        const res = await api.createDocument(payload);
+        if (res.code === 200 && res.data) {
+          alert(`新建文档成功！文档 ID: ${res.data.documentId}\n\n请求参数:\n${JSON.stringify(payload, null, 2)}`);
+          setIsCreateModalOpen(false);
+        } else {
+          alert(`创建失败: ${res.message || '未知错误'}`);
+        }
       }
     } catch (err) {
       console.error('Create doc failed', err);
+      alert('网络请求失败');
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -345,9 +371,10 @@ export const TopHeader = () => {
                 </span>
               </div>
               <div style={{ display:'flex', gap:12, alignItems:'center' }}>
-                <button onClick={() => setIsCreateModalOpen(false)} style={{ border:'none', backgroundColor:'transparent', fontSize:13, color:'#64748b', cursor:'pointer' }}>取消 (Esc)</button>
-                <button onClick={handleConfirmCreate} style={{ border:'none', backgroundColor:'#3b82f6', color:'#fff', fontSize:13, fontWeight:500, borderRadius:6, padding:'8px 16px', display:'flex', alignItems:'center', gap:6, cursor:'pointer', boxShadow:'0 1px 2px rgba(0,0,0,0.05)' }}>
-                  <Plus size={14} /> 立即创建 (Enter ↵)
+                <button onClick={() => !isCreating && setIsCreateModalOpen(false)} style={{ border:'none', backgroundColor:'transparent', fontSize:13, color:'#64748b', cursor: isCreating ? 'not-allowed' : 'pointer', opacity: isCreating ? 0.6 : 1 }}>取消 (Esc)</button>
+                <button onClick={handleConfirmCreate} disabled={isCreating} style={{ border:'none', backgroundColor:'#3b82f6', color:'#fff', fontSize:13, fontWeight:500, borderRadius:6, padding:'8px 16px', display:'flex', alignItems:'center', gap:6, cursor: isCreating ? 'wait' : 'pointer', boxShadow:'0 1px 2px rgba(0,0,0,0.05)', opacity: isCreating ? 0.7 : 1 }}>
+                  {isCreating ? <Sparkles size={14} className="animate-spin" /> : <Plus size={14} />} 
+                  {isCreating ? (templateId === 'api' && enableAi ? 'AI 正在生成...' : '创建中...') : '立即创建 (Enter ↵)'}
                 </button>
               </div>
             </div>

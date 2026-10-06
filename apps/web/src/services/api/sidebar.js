@@ -34,6 +34,16 @@ export const fetchTreeNodes = async (parentId) => {
   return res.json();
 };
 
+export const createFolder = async (data) => {
+  const baseUrl = getBaseUrl();
+  const res = await fetch(`${baseUrl}/tree-nodes/folder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return res.json();
+};
+
 export const fetchBookmarks = async () => {
   const baseUrl = getBaseUrl();
   const res = await fetch(`${baseUrl}/bookmarks`);

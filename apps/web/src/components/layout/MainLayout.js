@@ -1,14 +1,15 @@
 import React from 'react';
 import Head from 'next/head';
 import styles from '../../pages/index.module.css';
-import { LeftSidebar } from './LeftSidebar';
+import { LeftSidebar } from './LeftSidebar/index';
 import { TopHeader } from './TopHeader';
 import { EditorArea } from './EditorArea';
+import { GraphArea } from './GraphArea';
 import { RightSidebar } from './RightSidebar';
 import { useSelector } from 'react-redux';
 
 export const MainLayout = () => {
-  const { isLeftSidebarOpen, isRightSidebarOpen } = useSelector(state => state.layout);
+  const { isLeftSidebarOpen, isRightSidebarOpen, activeNavItem } = useSelector(state => state.layout);
 
   return (
     <div className={styles.layout}>
@@ -22,11 +23,11 @@ export const MainLayout = () => {
       {/* Main Area */}
       <div className={styles.mainArea}>
         <TopHeader />
-        <EditorArea />
+        {activeNavItem === 'graph' ? <GraphArea /> : <EditorArea />}
       </div>
 
       {/* Right Sidebar */}
-      {isRightSidebarOpen && <RightSidebar />}
+      {activeNavItem !== 'graph' && isRightSidebarOpen && <RightSidebar />}
     </div>
   );
 };

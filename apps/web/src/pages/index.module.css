@@ -114,6 +114,12 @@
 .treeNode.level1 { padding-left: 24px; }
 .treeNode.level2 { padding-left: 42px; }
 
+/* 目录树节点 Hover 时显示右侧操作按钮 */
+.treeNodeHoverable:hover .actionIcon {
+  visibility: visible !important;
+  color: #3b82f6 !important;
+}
+
 .statusBadge {
   margin-left: auto;
   font-size: 11px;

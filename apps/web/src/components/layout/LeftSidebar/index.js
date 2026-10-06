@@ -63,32 +63,72 @@ export const LeftSidebar = () => {
     api.updatePreferences({ activeNavItem: navId }).catch(err => console.error('Failed to update preferences', err));
   };
 
+  // 新建根目录
+  const handleCreateFolder = async (e, parentId = null) => {
+    e.stopPropagation(); // 防止触发折叠/展开
+    const folderName = window.prompt('请输入新建目录的名称：');
+    if (!folderName || !folderName.trim()) return;
+
+    try {
+      const res = await api.createFolder({ title: folderName.trim(), parentId: parentId });
+      if (res.code === 200 && res.data) {
+        dispatch(addTreeNodes([res.data]));
+        
+        // 如果是在某个父节点下新建的，确保该父节点处于展开状态
+        if (parentId && !expandedNodes.includes(parentId)) {
+          dispatch(toggleNodeExpansion(parentId));
+          api.updatePreferences({ expandedNodes: [...expandedNodes, parentId] }).catch(err => console.error('Failed to update preferences', err));
+        }
+      } else {
+        alert(res.message || '创建目录失败');
+      }
+    } catch (err) {
+      console.error('Failed to create folder', err);
+      alert('网络请求失败');
+    }
+  };
+
   // 递归渲染树节点
   const renderTree = (parentId = null, level = 0) => {
     const nodes = treeNodes.filter(n => n.parentId === parentId);
     return nodes.map(node => (
       <React.Fragment key={node.id}>
         <div 
-          className={`${styles.treeNode} ${level > 0 ? styles.level1 : ''}`} 
-          style={{ paddingLeft: level > 0 ? `${level * 12 + 12}px` : undefined }}
+          className={`${styles.treeNode} ${level > 0 ? styles.level1 : ''} ${styles.treeNodeHoverable}`} 
+          style={{ paddingLeft: level > 0 ? `${level * 12 + 12}px` : undefined, display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '16px' }}
           onClick={() => node.type === 'folder' ? handleToggleNode(node.id, node.hasChildren) : null}
         >
-          {node.type === 'folder' ? (
-            <>
-              {isExpanded(node.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />} 
-              {node.title}
-            </>
-          ) : (
-            <>
-              <FileText size={14} color={node.status === 'review' ? '#3b82f6' : undefined} /> 
-              {node.title}
-              {node.status && (
-                <span className={`${styles.statusBadge} ${styles[node.status] || ''}`}>
-                  {node.status === 'review' ? '评审中' : node.status === 'final' ? '定稿' : '草稿'}
-                </span>
-              )}
-            </>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {node.type === 'folder' ? (
+              <>
+                {isExpanded(node.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />} 
+                {node.title}
+              </>
+            ) : (
+              <>
+                <FileText size={14} color={node.status === 'review' ? '#3b82f6' : undefined} /> 
+                {node.title}
+              </>
+            )}
+          </div>
+          
+          {/* 右侧动作区 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {node.type === 'folder' && (
+              <Plus 
+                size={14} 
+                className={styles.actionIcon} 
+                style={{ color: '#94a3b8', cursor: 'pointer', visibility: 'hidden' }} // 默认隐藏，通过 CSS hover 显示
+                onClick={(e) => handleCreateFolder(e, node.id)} 
+                title="在此目录下新建文件夹"
+              />
+            )}
+            {node.type === 'document' && node.status && (
+              <span className={`${styles.statusBadge} ${styles[node.status] || ''}`}>
+                {node.status === 'review' ? '评审中' : node.status === 'final' ? '定稿' : '草稿'}
+              </span>
+            )}
+          </div>
         </div>
         {node.type === 'folder' && isExpanded(node.id) && renderTree(node.id, level + 1)}
       </React.Fragment>
@@ -151,7 +191,7 @@ export const LeftSidebar = () => {
       <div className={styles.sidebarSection} style={{ flex: 1, overflow: 'auto' }}>
         <div className={styles.sidebarTitle}>
           <span>目录树结构</span>
-          <Plus size={14} />
+          <Plus size={14} style={{ cursor: 'pointer', color: '#64748b' }} onClick={(e) => handleCreateFolder(e, null)} title="新建根目录" />
         </div>
         
         {renderTree(null, 0)}
