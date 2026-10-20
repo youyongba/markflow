@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Folder, Search, Share, Plus, ChevronDown, AlignLeft, X, FileText, CheckCircle, Sparkles } from 'lucide-react';
+import { Folder, Search, Share, Plus, ChevronDown, AlignLeft, X, FileText, CheckCircle, Sparkles, Settings, Keyboard, ArrowRightLeft, LogOut } from 'lucide-react';
 import styles from '../../pages/index.module.css';
 import { toggleLeftSidebar } from '../../store/slices/layoutSlice';
 import * as api from '../../services/api/header';
@@ -20,6 +20,7 @@ export const TopHeader = () => {
   
   // 新建文档弹窗状态
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [docTitle, setDocTitle] = useState('ADR-005-分布式元数据同步方案.md');
   const [docDirectory, setDocDirectory] = useState('architecture');
@@ -136,11 +137,14 @@ export const TopHeader = () => {
     }
   };
 
-  // 关闭搜索弹窗
+  // 关闭搜索弹窗和用户菜单
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (!e.target.closest(`.${styles.searchBar}`)) {
         setIsSearchOpen(false);
+      }
+      if (!e.target.closest(`.${styles.avatar}`)) {
+        setIsUserMenuOpen(false);
       }
     };
     document.addEventListener('click', handleClickOutside);
@@ -156,6 +160,32 @@ export const TopHeader = () => {
       ...(headerContext.paths?.map(p => p.title) || [])
     ].filter(Boolean);
     return parts.join(' / ');
+  };
+
+  const handleLogout = async () => {
+    try {
+      const res = await fetch('https://mock.24os.cn/b5899d0d-a777-4b5f-a4e4-e73dcb2fca19/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ logoutAllDevices: false })
+      });
+      
+      const data = await res.json();
+      
+      if (data.code === 200) {
+        // 1. 清除本地缓存的 token
+        localStorage.removeItem('token');
+        // 2. 跳转回登录页
+        window.location.href = '/auth/login';
+      } else {
+        alert(data.message || '退出登录失败');
+      }
+    } catch (err) {
+      console.error('Logout failed:', err);
+      alert('网络请求失败');
+    }
   };
 
   return (
@@ -249,7 +279,11 @@ export const TopHeader = () => {
         <div className={`${styles.actionBtn} ${styles.btnPrimary}`} onClick={handleCreateDoc} style={{ cursor: 'pointer' }}>
           <Plus size={14} /> 新建文档
         </div>
-        <div className={styles.avatar}>
+        <div 
+          className={styles.avatar} 
+          style={{ position: 'relative', cursor: 'pointer' }}
+          onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+        >
           {userProfile ? (
             <img 
               src={userProfile.avatarUrl} 
@@ -261,6 +295,66 @@ export const TopHeader = () => {
             />
           ) : (
             <div style={{ width: 28, height: 28, backgroundColor: '#e2e8f0', borderRadius: '50%' }} />
+          )}
+
+          {/* 用户菜单浮层 */}
+          {isUserMenuOpen && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              right: 0,
+              marginTop: '12px',
+              width: '280px',
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+              border: '1px solid #e2e8f0',
+              zIndex: 100,
+              overflow: 'hidden',
+              cursor: 'default'
+            }} onClick={e => e.stopPropagation()}>
+              {/* 头部信息 */}
+              <div style={{ padding: '16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                <img 
+                  src={userProfile?.avatarUrl || "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex"} 
+                  alt="avatar" 
+                  style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover' }} 
+                />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ fontSize: '16px', fontWeight: '500', color: '#0f172a' }}>
+                    {userProfile?.userName || 'Alex Chen (陈希)'}
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#64748b' }}>
+                    {userProfile?.userName ? `${userProfile.userName.toLowerCase().replace(/\s/g, '')}@markflow.internal` : 'alex@markflow.internal'}
+                  </div>
+                  <div style={{ marginTop: '4px', alignSelf: 'flex-start', backgroundColor: '#e0e7ff', color: '#3730a3', fontSize: '12px', fontWeight: '600', padding: '4px 8px', borderRadius: '4px' }}>
+                    {userProfile?.role || 'Owner / Staff Arch'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ height: '1px', backgroundColor: '#e2e8f0' }} />
+
+            
+
+              <div style={{ height: '1px', backgroundColor: '#e2e8f0' }} />
+
+              {/* 退出登录 */}
+              <div style={{ padding: '8px 0' }}>
+                <div 
+                  style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'background 0.2s' }} 
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#fef2f2'} 
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                  onClick={handleLogout}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#b91c1c', fontSize: '14px', fontWeight: '500' }}>
+                    <LogOut size={18} />
+                    <span>退出登录</span>
+                  </div>
+                  <div style={{ color: '#ef4444', fontSize: '13px' }}>Sign out</div>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>

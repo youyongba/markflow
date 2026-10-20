@@ -2,7 +2,7 @@ import React, { useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
   Folder, GitGraph, Search, Tags, Settings, ChevronDown, ChevronRight, 
-  FileText, Plus, AlignLeft 
+  FileText, Plus, AlignLeft, Trash2, Edit2
 } from 'lucide-react';
 import styles from '../../../pages/index.module.css';
 import { 
@@ -88,6 +88,67 @@ export const LeftSidebar = () => {
     }
   };
 
+  // 重命名目录
+  const handleEditFolder = async (e, node) => {
+    e.stopPropagation();
+    const newName = window.prompt('请输入新的目录名称：', node.title);
+    if (!newName || !newName.trim() || newName.trim() === node.title) return;
+
+    try {
+      const res = await api.updateFolder(node.id, { title: newName.trim() });
+      if (res.code === 200) {
+        // 更新本地 Redux 状态
+        const updatedNodes = treeNodes.map(n => n.id === node.id ? { ...n, title: newName.trim() } : n);
+        dispatch(setTreeNodes(updatedNodes));
+      } else {
+        alert(res.message || '重命名失败');
+      }
+    } catch (err) {
+      console.error('Failed to rename folder', err);
+      alert('网络请求失败');
+    }
+  };
+
+  // 删除目录
+  const handleDeleteFolder = async (e, nodeId) => {
+    e.stopPropagation();
+    if (!window.confirm('确定要删除该目录及其所有子内容吗？此操作不可恢复。')) return;
+
+    try {
+      const res = await api.deleteFolder(nodeId);
+      if (res.code === 200) {
+        // 更新本地 Redux 状态：过滤掉被删除的节点及其子节点
+        const updatedNodes = treeNodes.filter(n => n.id !== nodeId && n.parentId !== nodeId);
+        dispatch(setTreeNodes(updatedNodes));
+      } else {
+        alert(res.message || '删除失败');
+      }
+    } catch (err) {
+      console.error('Failed to delete folder', err);
+      alert('网络请求失败');
+    }
+  };
+
+  // 删除文档
+  const handleDeleteDocument = async (e, nodeId) => {
+    e.stopPropagation();
+    if (!window.confirm('确定要删除该文档吗？')) return;
+
+    try {
+      const res = await api.deleteDocument(nodeId);
+      if (res.code === 200) {
+        // 更新本地 Redux 状态：过滤掉被删除的文档节点
+        const updatedNodes = treeNodes.filter(n => n.id !== nodeId);
+        dispatch(setTreeNodes(updatedNodes));
+      } else {
+        alert(res.message || '删除失败');
+      }
+    } catch (err) {
+      console.error('Failed to delete document', err);
+      alert('网络请求失败');
+    }
+  };
+
   // 递归渲染树节点
   const renderTree = (parentId = null, level = 0) => {
     const nodes = treeNodes.filter(n => n.parentId === parentId);
@@ -115,18 +176,43 @@ export const LeftSidebar = () => {
           {/* 右侧动作区 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {node.type === 'folder' && (
-              <Plus 
-                size={14} 
-                className={styles.actionIcon} 
-                style={{ color: '#94a3b8', cursor: 'pointer', visibility: 'hidden' }} // 默认隐藏，通过 CSS hover 显示
-                onClick={(e) => handleCreateFolder(e, node.id)} 
-                title="在此目录下新建文件夹"
-              />
+              <div className={styles.actionIconGroup} style={{ display: 'flex', gap: '4px', visibility: 'hidden' }}>
+                <Plus 
+                  size={14} 
+                  style={{ color: '#94a3b8', cursor: 'pointer' }}
+                  onClick={(e) => handleCreateFolder(e, node.id)} 
+                  title="在此目录下新建文件夹"
+                />
+                <Edit2 
+                  size={14} 
+                  style={{ color: '#94a3b8', cursor: 'pointer' }}
+                  onClick={(e) => handleEditFolder(e, node)} 
+                  title="重命名目录"
+                />
+                <Trash2 
+                  size={14} 
+                  style={{ color: '#ef4444', cursor: 'pointer' }}
+                  onClick={(e) => handleDeleteFolder(e, node.id)} 
+                  title="删除目录"
+                />
+              </div>
             )}
-            {node.type === 'document' && node.status && (
-              <span className={`${styles.statusBadge} ${styles[node.status] || ''}`}>
-                {node.status === 'review' ? '评审中' : node.status === 'final' ? '定稿' : '草稿'}
-              </span>
+            {node.type === 'document' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div className={styles.actionIconGroup} style={{ display: 'flex', gap: '4px', visibility: 'hidden' }}>
+                  <Trash2 
+                    size={14} 
+                    style={{ color: '#ef4444', cursor: 'pointer' }}
+                    onClick={(e) => handleDeleteDocument(e, node.id)} 
+                    title="删除文档"
+                  />
+                </div>
+                {node.status && (
+                  <span className={`${styles.statusBadge} ${styles[node.status] || ''}`}>
+                    {node.status === 'review' ? '评审中' : node.status === 'final' ? '定稿' : '草稿'}
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>

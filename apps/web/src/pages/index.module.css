@@ -115,7 +115,8 @@
 .treeNode.level2 { padding-left: 42px; }
 
 /* 目录树节点 Hover 时显示右侧操作按钮 */
-.treeNodeHoverable:hover .actionIcon {
+.treeNodeHoverable:hover .actionIcon,
+.treeNodeHoverable:hover .actionIconGroup {
   visibility: visible !important;
   color: #3b82f6 !important;
 }
@@ -227,7 +228,6 @@
   height: 28px;
   border-radius: 50%;
   background-color: #cbd5e1;
-  overflow: hidden;
 }
 
 /* --- Editor Area Styles --- */

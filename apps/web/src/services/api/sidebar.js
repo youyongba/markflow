@@ -49,3 +49,35 @@ export const fetchBookmarks = async () => {
   const res = await fetch(`${baseUrl}/bookmarks`);
   return res.json();
 };
+
+// 6. 重命名目录
+export const updateFolder = async (id, data) => {
+  // 注意: 因为 mock 服务平台限制了通配符路由，我们将所有的 id 操作路由到 /tree-nodes/folder/1
+  const url = `${getBaseUrl()}/tree-nodes/folder/1`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return res.json();
+};
+
+// 7. 删除目录
+export const deleteFolder = async (id) => {
+  // 同理，路由到 /tree-nodes/folder/1
+  const url = `${getBaseUrl()}/tree-nodes/folder/1`;
+  const res = await fetch(url, {
+    method: 'DELETE'
+  });
+  return res.json();
+};
+
+// 8. 删除文档
+export const deleteDocument = async (id) => {
+  // 路由到 /tree-nodes/document/1 节点
+  const url = `${getBaseUrl()}/tree-nodes/document/1`;
+  const res = await fetch(url, {
+    method: 'DELETE'
+  });
+  return res.json();
+};
