@@ -1,9 +1,5 @@
 export const getBaseUrl = () => {
-  // Use environment variable if available, otherwise fallback to local proxy
-  if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  return 'https://mock.24os.cn/b5899d0d-a777-4b5f-a4e4-e73dcb2fca19';
+  return '/v2.4/editor';
 };
 
 /**

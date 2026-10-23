@@ -7,29 +7,51 @@ import {
 import styles from '../../../pages/index.module.css';
 import { 
   setActiveNavItem, toggleNodeExpansion, toggleLeftSidebar, 
-  setPreferences, setTreeNodes, addTreeNodes, setBookmarks 
+  setPreferences, setTreeNodes, addTreeNodes, setBookmarks,
+  setActiveDocument
 } from '../../../store/slices/layoutSlice';
 import * as api from '../../../services/api/sidebar';
 
 export const LeftSidebar = () => {
   const dispatch = useDispatch();
-  const { activeNavItem, expandedNodes, treeNodes, bookmarks, filesCount, tagsCount } = useSelector((state) => state.layout);
+  const { activeNavItem, expandedNodes, treeNodes, bookmarks, filesCount, tagsCount, activeDocument } = useSelector((state) => state.layout);
   
   const isExpanded = (nodeId) => expandedNodes.includes(nodeId);
 
   // 初始化拉取
   useEffect(() => {
-    api.fetchPreferences().then(res => {
-      if (res.code === 200 && res.data) dispatch(setPreferences(res.data));
-    }).catch(err => console.error('Failed to fetch preferences', err));
-    
-    api.fetchTreeNodes().then(res => {
-      if (res.code === 200 && res.data) dispatch(setTreeNodes(res.data));
-    }).catch(err => console.error('Failed to fetch tree nodes', err));
+    // 并行拉取基础数据
+    Promise.all([
+      api.fetchPreferences(),
+      api.fetchTreeNodes(),
+      api.fetchBookmarks()
+    ]).then(([prefRes, treeRes, bookmarkRes]) => {
+      if (bookmarkRes.code === 200 && bookmarkRes.data) {
+        dispatch(setBookmarks(bookmarkRes.data));
+      }
+      
+      if (treeRes.code === 200 && treeRes.data) {
+        dispatch(setTreeNodes(treeRes.data));
+      }
 
-    api.fetchBookmarks().then(res => {
-      if (res.code === 200 && res.data) dispatch(setBookmarks(res.data));
-    }).catch(err => console.error('Failed to fetch bookmarks', err));
+      if (prefRes.code === 200 && prefRes.data) {
+        dispatch(setPreferences(prefRes.data));
+        
+        // 自动拉取已被持久化为“展开”状态的目录子节点
+        const expanded = prefRes.data.expandedNodes || [];
+        expanded.forEach(nodeId => {
+          // 排除静态的非数据库节点 ID (如 doc-space, bookmarks 等)
+          const isDbNode = typeof nodeId === 'number' || (typeof nodeId === 'string' && /^[0-9]+$/.test(nodeId));
+          if (isDbNode) {
+            api.fetchTreeNodes(nodeId).then(childRes => {
+              if (childRes.code === 200 && childRes.data) {
+                dispatch(addTreeNodes(childRes.data));
+              }
+            }).catch(err => console.error('Failed to fetch child nodes for expanded folder', err));
+          }
+        });
+      }
+    }).catch(err => console.error('Failed to fetch initial data', err));
   }, [dispatch]);
 
   // 展开/折叠处理，并增量同步
@@ -154,10 +176,22 @@ export const LeftSidebar = () => {
     const nodes = treeNodes.filter(n => n.parentId === parentId);
     return nodes.map(node => (
       <React.Fragment key={node.id}>
-        <div 
-          className={`${styles.treeNode} ${level > 0 ? styles.level1 : ''} ${styles.treeNodeHoverable}`} 
-          style={{ paddingLeft: level > 0 ? `${level * 12 + 12}px` : undefined, display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '16px' }}
-          onClick={() => node.type === 'folder' ? handleToggleNode(node.id, node.hasChildren) : null}
+        <div
+          className={`${styles.treeNode} ${level > 0 ? styles.level1 : ''} ${styles.treeNodeHoverable} ${activeDocument?.id === node.id ? styles.active : ''}`}
+          style={{ paddingLeft: level > 0 ? `${level * 12 + 12}px` : undefined, display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '16px', userSelect: 'none' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            console.log('Tree node clicked:', node);
+            if (node.type === 'folder') {
+              handleToggleNode(node.id, node.hasChildren);
+            } else if (node.type === 'document') {
+              dispatch(setActiveDocument({
+                id: node.id,
+                title: node.title,
+                status: node.status || 'draft',
+              }));
+            }
+          }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {node.type === 'folder' ? (
@@ -176,7 +210,7 @@ export const LeftSidebar = () => {
           {/* 右侧动作区 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {node.type === 'folder' && (
-              <div className={styles.actionIconGroup} style={{ display: 'flex', gap: '4px', visibility: 'hidden' }}>
+              <div className={styles.actionIconGroup} style={{ display: 'flex', gap: '4px' }}>
                 <Plus 
                   size={14} 
                   style={{ color: '#94a3b8', cursor: 'pointer' }}
@@ -199,7 +233,7 @@ export const LeftSidebar = () => {
             )}
             {node.type === 'document' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div className={styles.actionIconGroup} style={{ display: 'flex', gap: '4px', visibility: 'hidden' }}>
+                <div className={styles.actionIconGroup} style={{ display: 'flex', gap: '4px' }}>
                   <Trash2 
                     size={14} 
                     style={{ color: '#ef4444', cursor: 'pointer' }}

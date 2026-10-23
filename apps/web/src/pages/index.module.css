@@ -110,14 +110,27 @@
 .treeNode:hover {
   background-color: #e2e8f0;
 }
+.treeNode.active {
+  background-color: #e2e8f0;
+  font-weight: 500;
+  color: #0f172a;
+}
 
 .treeNode.level1 { padding-left: 24px; }
 .treeNode.level2 { padding-left: 42px; }
 
 /* 目录树节点 Hover 时显示右侧操作按钮 */
+.actionIcon,
+.actionIconGroup {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease;
+}
+
 .treeNodeHoverable:hover .actionIcon,
 .treeNodeHoverable:hover .actionIconGroup {
-  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
   color: #3b82f6 !important;
 }
 

@@ -27,7 +27,7 @@ const Copy = ({ size, ...props }) => (
 export const EditorArea = () => {
   const dispatch = useDispatch();
   const { activeTab, isSyncScroll, activeDocument } = useSelector(state => state.layout);
-  const currentDocId = 'doc_101'; // 假设当前正在编辑的文档 ID
+  const currentDocId = activeDocument?.id;
 
   // 1. 文档源码状态
   const [sourceCode, setSourceCode] = useState('');
@@ -74,10 +74,15 @@ export const EditorArea = () => {
 
   // 初始化拉取文档源码
   useEffect(() => {
+    if (!currentDocId) {
+      setSourceCode('');
+      setLastSavedAt('');
+      return;
+    }
     api.fetchContent(currentDocId).then(res => {
       if (res.code === 200 && res.data) {
         setSourceCode(res.data.source || '');
-        
+
         if (res.data.lastSavedAt) {
           const date = new Date(res.data.lastSavedAt);
           setLastSavedAt(date.toLocaleTimeString('en-US', { hour12: false }));
@@ -90,6 +95,7 @@ export const EditorArea = () => {
 
   // 抽取通用的防抖保存逻辑
   const debouncedSave = useCallback((newCode) => {
+    if (!currentDocId) return;
     setLastSavedAt('保存中...');
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -312,6 +318,17 @@ export const EditorArea = () => {
 
   // 计算当前文本的行数
   const lineCount = sourceCode.split('\n').length;
+
+  if (!currentDocId) {
+    return (
+      <div className={styles.editorArea} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center' }}>
+          <FileText size={48} style={{ margin: '0 auto 16px', opacity: 0.5 }} />
+          <p>请在左侧边栏选择一个文档</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.editorArea}>

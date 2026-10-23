@@ -31,7 +31,7 @@ export default function Login() {
 
     try {
       // 1. 获取公钥 (模拟非对称加密流程)
-      const pkRes = await fetch('https://mock.24os.cn/b5899d0d-a777-4b5f-a4e4-e73dcb2fca19/public-key');
+      const pkRes = await fetch('/v2.4/auth/public-key');
       const pkData = await pkRes.json();
       
       // 2. 将用户名和密码作为一个整体 Payload 进行加密
@@ -41,7 +41,7 @@ export default function Login() {
       const mockEncryptedPayload = btoa(unescape(encodeURIComponent(JSON.stringify(payloadObj))));
 
       // 3. 发送登录请求
-      const loginRes = await fetch('https://mock.24os.cn/b5899d0d-a777-4b5f-a4e4-e73dcb2fca19/login', {
+      const loginRes = await fetch('/v2.4/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

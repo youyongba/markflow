@@ -211,4 +211,25 @@ VALUES (
     'Alex Chen',
     'Owner / Staff Arch',
     'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex'
-);
+);-- 初始化默认工作区
+INSERT OR IGNORE INTO workspaces (id, name, owner_id) VALUES (1, 'Engineering Wiki', 1);
+
+-- 初始化目录树节点 (文件夹)
+INSERT OR IGNORE INTO tree_nodes (id, workspace_id, parent_id, node_type, title, status, sort_order) VALUES
+(1, 1, NULL, 'folder', '架构设计', NULL, 1),
+(2, 1, NULL, 'folder', 'API 文档', NULL, 2),
+(3, 1, NULL, 'folder', '开发规范', NULL, 3);
+
+-- 初始化目录树节点 (文档)
+INSERT OR IGNORE INTO tree_nodes (id, workspace_id, parent_id, node_type, title, status, sort_order) VALUES
+(4, 1, 1, 'document', 'ADR-004-存储选型.md', 'review', 1),
+(5, 1, 1, 'document', 'ADR-005-分布式元数据同步方案.md', 'draft', 2),
+(6, 1, 2, 'document', 'v2.4-登录与认证接口文档.md', 'final', 1),
+(7, 1, 3, 'document', '前端编码规范.md', 'draft', 1);
+
+-- 初始化对应的正文内容
+INSERT OR IGNORE INTO document_contents (document_id, source) VALUES
+(4, '# ADR-004 存储选型\n\n## 1. 背景\n随着系统规模扩大，我们需要选择合适的数据库...\n\n## 2. 方案对比\n- **MySQL**: 关系型，稳定...\n- **SQLite**: 轻量，无需独立进程...\n\n## 3. 决定\n采用 SQLite 作为初始存储方案。'),
+(5, '# ADR-005 分布式元数据同步方案\n\n草稿中...'),
+(6, '# v2.4 登录与认证接口文档\n\n## POST /api/v2.4/auth/login\n登录接口说明...'),
+(7, '# 前端编码规范\n\n## 1. 缩进\n使用 2 个空格。');

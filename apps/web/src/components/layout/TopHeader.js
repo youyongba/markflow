@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Folder, Search, Share, Plus, ChevronDown, AlignLeft, X, FileText, CheckCircle, Sparkles, Settings, Keyboard, ArrowRightLeft, LogOut } from 'lucide-react';
 import styles from '../../pages/index.module.css';
-import { toggleLeftSidebar } from '../../store/slices/layoutSlice';
+import { toggleLeftSidebar, setTreeNodes, toggleNodeExpansion, setPreferences, setActiveDocument } from '../../store/slices/layoutSlice';
 import * as api from '../../services/api/header';
+import * as sidebarApi from '../../services/api/sidebar';
 
 export const TopHeader = () => {
   const dispatch = useDispatch();
-  const { isLeftSidebarOpen } = useSelector((state) => state.layout);
+  const { isLeftSidebarOpen, expandedNodes, activeDocument } = useSelector((state) => state.layout);
+  const currentDocId = activeDocument?.id;
 
   const [headerContext, setHeaderContext] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
@@ -23,7 +25,8 @@ export const TopHeader = () => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [docTitle, setDocTitle] = useState('ADR-005-分布式元数据同步方案.md');
-  const [docDirectory, setDocDirectory] = useState('architecture');
+  const [docDirectory, setDocDirectory] = useState('');
+  const [treeFolders, setTreeFolders] = useState([]);
   const [frontmatter, setFrontmatter] = useState('standard');
   const [templateId, setTemplateId] = useState('adr');
   const [enableAi, setEnableAi] = useState(true);
@@ -35,15 +38,31 @@ export const TopHeader = () => {
     }
   };
 
-  // 初始化拉取顶部上下文和用户信息
+  // 监听当前文档变化，刷新顶部面包屑上下文
   useEffect(() => {
-    api.fetchContext().then(res => {
+    api.fetchContext(currentDocId).then(res => {
       if (res.code === 200) setHeaderContext(res.data);
     }).catch(err => console.error('Failed to fetch header context', err));
+  }, [currentDocId]);
 
+  // 初始化拉取用户信息和目录树
+  useEffect(() => {
     api.fetchUserProfile().then(res => {
       if (res.code === 200) setUserProfile(res.data);
     }).catch(err => console.error('Failed to fetch user profile', err));
+
+    // 拉取所有文件夹节点供新建文档选择
+    sidebarApi.fetchTreeNodes().then(res => {
+      if (res.code === 200) {
+        // 过滤出所有 type 为 folder 的节点
+        const folders = res.data.filter(node => node.type === 'folder');
+        setTreeFolders(folders);
+        // 如果有文件夹，默认选中第一个
+        if (folders.length > 0) {
+           setDocDirectory(folders[0].id);
+        }
+      }
+    }).catch(err => console.error('Failed to fetch tree nodes for dropdown', err));
   }, []);
 
   // 生成分享链接交互
@@ -61,22 +80,25 @@ export const TopHeader = () => {
   // 打开新建文档弹窗
   const handleCreateDoc = () => setIsCreateModalOpen(true);
 
+
   // 确认创建文档
   const handleConfirmCreate = async () => {
     if (isCreating) return;
     setIsCreating(true);
     try {
-      if (templateId === 'api' && enableAi) {
-        // 调用专用的新建 REST API 模板接口
+      let documentId;
+      if (templateId === 'api') {
+        // 调用专用的新建 REST API 模板接口 (不再依赖 enableAi)
         const payload = {
           title: docTitle || '无标题文档',
           parentId: docDirectory,
-          apiDescription: aiPrompt,
+          apiDescription: "生成API文档",
           apiType: 'rest'
         };
         const res = await api.createApiTemplateDocument(payload);
         if (res.code === 200 && res.data) {
-          alert(`API 接口文档生成成功！\n文档 ID: ${res.data.documentId}\n\nAI 生成内容预览:\n${res.data.source.substring(0, 100)}...`);
+          documentId = res.data.documentId;
+          alert(`API 接口文档生成成功！\n文档 ID: ${res.data.documentId}\n\n生成内容预览:\n${res.data.source.substring(0, 100)}...`);
           setIsCreateModalOpen(false);
         } else {
           alert(`生成失败: ${res.message || '未知错误'}`);
@@ -85,18 +107,36 @@ export const TopHeader = () => {
         // 调用通用的新建文档接口
         const payload = {
           title: docTitle || '无标题文档',
-          parentId: docDirectory,
+          parentId: docDirectory === 'root' ? null : docDirectory,
           frontmatter: frontmatter,
           templateId: templateId,
-          enableAi: enableAi,
-          aiPrompt: enableAi ? aiPrompt : undefined
+          enableAi: false
         };
         const res = await api.createDocument(payload);
         if (res.code === 200 && res.data) {
+          documentId = res.data.documentId;
           alert(`新建文档成功！文档 ID: ${res.data.documentId}\n\n请求参数:\n${JSON.stringify(payload, null, 2)}`);
           setIsCreateModalOpen(false);
         } else {
           alert(`创建失败: ${res.message || '未知错误'}`);
+        }
+      }
+      
+      // 成功创建后，刷新侧边栏目录树并展开父节点
+      if (documentId) {
+        // 设置新建的文档为当前激活文档
+        dispatch(setActiveDocument({
+          id: parseInt(documentId) || documentId,
+          title: docTitle || '无标题文档',
+          status: 'draft'
+        }));
+
+        if (docDirectory && docDirectory !== 'root' && !expandedNodes.includes(docDirectory)) {
+          dispatch(toggleNodeExpansion(docDirectory)); // 确保该目录处于展开状态
+        }
+        const treeRes = await sidebarApi.fetchTreeNodes();
+        if (treeRes.code === 200) {
+          dispatch(setTreeNodes(treeRes.data));
         }
       }
     } catch (err) {
@@ -164,7 +204,7 @@ export const TopHeader = () => {
 
   const handleLogout = async () => {
     try {
-      const res = await fetch('https://mock.24os.cn/b5899d0d-a777-4b5f-a4e4-e73dcb2fca19/logout', {
+      const res = await fetch('/v2.4/header/logout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -245,7 +285,16 @@ export const TopHeader = () => {
                   gap: '4px'
                 }}
                 onClick={() => {
-                  alert(`即将跳转至: ${item.url}`);
+                  if (item.type === 'document') {
+                    // 如果是文档类型，直接派发加载该文档，实现真正的页面闭环
+                    dispatch(setActiveDocument({
+                      id: parseInt(item.id) || item.id,
+                      title: item.title,
+                      status: 'draft' // 从搜索列表跳转暂默认为 draft，实际应由后端返回
+                    }));
+                  } else {
+                    alert(`即将跳转至: ${item.url}`);
+                  }
                   setIsSearchOpen(false);
                 }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
@@ -325,7 +374,7 @@ export const TopHeader = () => {
                     {userProfile?.userName || 'Alex Chen (陈希)'}
                   </div>
                   <div style={{ fontSize: '13px', color: '#64748b' }}>
-                    {userProfile?.userName ? `${userProfile.userName.toLowerCase().replace(/\s/g, '')}@markflow.internal` : 'alex@markflow.internal'}
+                    {userProfile?.email || (userProfile?.userName ? `${userProfile.userName.toLowerCase().replace(/\s/g, '')}@markflow.internal` : 'alex@markflow.internal')}
                   </div>
                   <div style={{ marginTop: '4px', alignSelf: 'flex-start', backgroundColor: '#e0e7ff', color: '#3730a3', fontSize: '12px', fontWeight: '600', padding: '4px 8px', borderRadius: '4px' }}>
                     {userProfile?.role || 'Owner / Staff Arch'}
@@ -397,9 +446,10 @@ export const TopHeader = () => {
                   <div style={{ display:'flex', alignItems:'center', position:'relative', border:'1px solid #e2e8f0', borderRadius:6, backgroundColor:'#f8fafc' }}>
                     <Folder size={14} color="#64748b" style={{ position:'absolute', left:12 }} />
                     <select value={docDirectory} onChange={e => setDocDirectory(e.target.value)} style={{ width:'100%', appearance:'none', border:'none', backgroundColor:'transparent', padding:'8px 32px', fontSize:13, color:'#334155', outline:'none', cursor:'pointer' }}>
-                      <option value="architecture">架构设计 (Architecture)/</option>
-                      <option value="devops">运维手册 (DevOps)/</option>
-                      <option value="root">根目录 (Root)/</option>
+                      {treeFolders.map(folder => (
+                        <option key={folder.id} value={folder.id}>{folder.title}</option>
+                      ))}
+                      <option value="root">根目录 (Root)</option>
                     </select>
                     <ChevronDown size={14} color="#94a3b8" style={{ position:'absolute', right:12, pointerEvents:'none' }} />
                   </div>
@@ -444,7 +494,7 @@ export const TopHeader = () => {
                 </div>
               </div>
 
-              <div style={{ border: enableAi ? '1px solid #d8b4fe' : '1px solid #e2e8f0', backgroundColor: enableAi ? '#faf5ff' : '#f8fafc', borderRadius:8, padding:12 }}>
+              <div style={{ display:'none' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
                   <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                     <input type="checkbox" checked={enableAi} onChange={e => setEnableAi(e.target.checked)} style={{ accentColor:'#a855f7', width:14, height:14, cursor:'pointer' }} />
@@ -460,15 +510,15 @@ export const TopHeader = () => {
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 20px', backgroundColor:'#f8fafc', borderTop:'1px solid #e2e8f0' }}>
               <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'#64748b' }}>
                 <Folder size={14} color="#eab308" style={{ flexShrink: 0 }} />
-                <span style={{ maxWidth: 320, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`/${docDirectory === 'architecture' ? '架构设计 (Architecture)' : docDirectory === 'devops' ? '运维手册 (DevOps)' : '根目录 (Root)'}/${docTitle || '无标题文档'}`}>
-                  保存至: /{docDirectory === 'architecture' ? '架构设计 (Architecture)' : docDirectory === 'devops' ? '运维手册 (DevOps)' : '根目录 (Root)'}/{docTitle || '无标题文档'}
+                <span style={{ maxWidth: 320, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`/${treeFolders.find(f => f.id === docDirectory)?.title || '根目录 (Root)'}/${docTitle || '无标题文档'}`}>
+                  保存至: /{treeFolders.find(f => f.id === docDirectory)?.title || '根目录 (Root)'}/{docTitle || '无标题文档'}
                 </span>
               </div>
               <div style={{ display:'flex', gap:12, alignItems:'center' }}>
                 <button onClick={() => !isCreating && setIsCreateModalOpen(false)} style={{ border:'none', backgroundColor:'transparent', fontSize:13, color:'#64748b', cursor: isCreating ? 'not-allowed' : 'pointer', opacity: isCreating ? 0.6 : 1 }}>取消 (Esc)</button>
                 <button onClick={handleConfirmCreate} disabled={isCreating} style={{ border:'none', backgroundColor:'#3b82f6', color:'#fff', fontSize:13, fontWeight:500, borderRadius:6, padding:'8px 16px', display:'flex', alignItems:'center', gap:6, cursor: isCreating ? 'wait' : 'pointer', boxShadow:'0 1px 2px rgba(0,0,0,0.05)', opacity: isCreating ? 0.7 : 1 }}>
                   {isCreating ? <Sparkles size={14} className="animate-spin" /> : <Plus size={14} />} 
-                  {isCreating ? (templateId === 'api' && enableAi ? 'AI 正在生成...' : '创建中...') : '立即创建 (Enter ↵)'}
+                  {isCreating ? '创建中...' : '立即创建 (Enter ↵)'}
                 </button>
               </div>
             </div>

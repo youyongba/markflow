@@ -8,7 +8,7 @@ import * as api from '../../services/api/right-sidebar';
 export const RightSidebar = () => {
   const dispatch = useDispatch();
   const { activeDocument } = useSelector(state => state.layout);
-  const currentDocId = 'doc_current'; // 假设当前正在编辑的文档 ID
+  const currentDocId = activeDocument?.id;
 
   // 从接口动态拉取的状态
   const [dependencies, setDependencies] = useState([]);
@@ -16,6 +16,12 @@ export const RightSidebar = () => {
 
   // 初始化数据拉取
   useEffect(() => {
+    if (!currentDocId) {
+      setDependencies([]);
+      setCommits([]);
+      return;
+    }
+    
     // 1. 拉取文档基础属性 (Frontmatter)
     api.fetchDocProperties(currentDocId).then(res => {
       if (res.code === 200 && res.data) {
@@ -36,7 +42,7 @@ export const RightSidebar = () => {
         setCommits(res.data);
       }
     }).catch(err => console.error('Failed to fetch commits', err));
-  }, [dispatch]);
+  }, [dispatch, currentDocId]);
 
   // 新增标签和依赖的交互状态
   const [isAddingTag, setIsAddingTag] = useState(false);
@@ -104,6 +110,16 @@ export const RightSidebar = () => {
 
   // 决定显示的提交记录数量
   const visibleCommits = isCommitsExpanded ? commits : commits.slice(0, 1);
+
+  if (!currentDocId) {
+    return (
+      <div className={styles.rightSidebar} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', color: '#94a3b8' }}>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontSize: 13 }}>无属性</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.rightSidebar}>

@@ -1,17 +1,13 @@
 const getBaseUrl = () => {
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  if (process.env.NEXT_PUBLIC_API_MODE === 'mock') {
-    return 'https://mock.24os.cn/b5899d0d-a777-4b5f-a4e4-e73dcb2fca19';
-  }
-  return 'https://api.markflow.com/v2.4';
+  return '/v2.4/header';
 };
 
 export const fetchContext = async (documentId) => {
   const baseUrl = getBaseUrl();
-  const url = new URL(`${baseUrl}/context`);
-  if (documentId) url.searchParams.append('documentId', documentId);
+  const query = new URLSearchParams();
+  if (documentId) query.append('documentId', documentId);
+  const queryString = query.toString();
+  const url = `${baseUrl}/context${queryString ? '?' + queryString : ''}`;
   const res = await fetch(url);
   return res.json();
 };
@@ -54,10 +50,12 @@ export const createApiTemplateDocument = async (data) => {
 
 export const searchGlobal = async (keyword, type = 'all', limit = 10) => {
   const baseUrl = getBaseUrl();
-  const url = new URL(`${baseUrl}/search`);
-  url.searchParams.append('keyword', keyword);
-  url.searchParams.append('type', type);
-  url.searchParams.append('limit', limit);
+  const query = new URLSearchParams();
+  if (keyword) query.append('keyword', keyword);
+  if (type) query.append('type', type);
+  if (limit) query.append('limit', limit);
+  const queryString = query.toString();
+  const url = `${baseUrl}/search${queryString ? '?' + queryString : ''}`;
   const res = await fetch(url);
   return res.json();
 };

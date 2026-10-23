@@ -1,12 +1,5 @@
 const getBaseUrl = () => {
-  // 优先使用环境变量，如果未注入则根据 mode 降级到对应的默认 URL
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  if (process.env.NEXT_PUBLIC_API_MODE === 'mock') {
-    return 'https://mock.24os.cn/b5899d0d-a777-4b5f-a4e4-e73dcb2fca19';
-  }
-  return 'https://api.markflow.com/v2.4';
+  return '/v2.4/sidebar';
 };
 
 export const fetchPreferences = async () => {
@@ -27,8 +20,10 @@ export const updatePreferences = async (data) => {
 
 export const fetchTreeNodes = async (parentId) => {
   const baseUrl = getBaseUrl();
-  const url = new URL(`${baseUrl}/tree-nodes`);
-  if (parentId) url.searchParams.append('parentId', parentId);
+  const query = new URLSearchParams();
+  if (parentId) query.append('parentId', parentId);
+  const queryString = query.toString();
+  const url = `${baseUrl}/tree-nodes${queryString ? '?' + queryString : ''}`;
   
   const res = await fetch(url);
   return res.json();
@@ -52,8 +47,8 @@ export const fetchBookmarks = async () => {
 
 // 6. 重命名目录
 export const updateFolder = async (id, data) => {
-  // 注意: 因为 mock 服务平台限制了通配符路由，我们将所有的 id 操作路由到 /tree-nodes/folder/1
-  const url = `${getBaseUrl()}/tree-nodes/folder/1`;
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/tree-nodes/folder/${id}`;
   const res = await fetch(url, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -64,8 +59,8 @@ export const updateFolder = async (id, data) => {
 
 // 7. 删除目录
 export const deleteFolder = async (id) => {
-  // 同理，路由到 /tree-nodes/folder/1
-  const url = `${getBaseUrl()}/tree-nodes/folder/1`;
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/tree-nodes/folder/${id}`;
   const res = await fetch(url, {
     method: 'DELETE'
   });
@@ -74,8 +69,8 @@ export const deleteFolder = async (id) => {
 
 // 8. 删除文档
 export const deleteDocument = async (id) => {
-  // 路由到 /tree-nodes/document/1 节点
-  const url = `${getBaseUrl()}/tree-nodes/document/1`;
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/tree-nodes/document/${id}`;
   const res = await fetch(url, {
     method: 'DELETE'
   });

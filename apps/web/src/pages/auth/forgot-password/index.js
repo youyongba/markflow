@@ -21,7 +21,7 @@ export default function ForgotPassword() {
     setError('');
     
     try {
-      const res = await fetch('https://mock.24os.cn/b5899d0d-a777-4b5f-a4e4-e73dcb2fca19/password/forgot', {
+      const res = await fetch('/v2.4/auth/password/forgot', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

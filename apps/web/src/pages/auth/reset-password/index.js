@@ -65,7 +65,7 @@ export default function ResetPassword() {
       const urlParams = new URLSearchParams(window.location.search);
       const resetToken = urlParams.get('token') || 'mock-token-123';
 
-      const res = await fetch('https://mock.24os.cn/b5899d0d-a777-4b5f-a4e4-e73dcb2fca19/password/reset', {
+      const res = await fetch('/v2.4/auth/password/reset', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
