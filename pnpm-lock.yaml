@@ -35,6 +35,9 @@ importers:
       node-rsa:
         specifier: ^2.0.0
         version: 2.0.0
+      nodemailer:
+        specifier: ^10.2.1
+        version: 10.2.1
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -1048,6 +1051,10 @@ packages:
   node-rsa@2.0.0:
     resolution: {integrity: sha512-7yfzccmBd5rm7pALJf709tPwLL987WvdT7LC/QK5Oxa5S2aabdBPjxRDxhWKkbfCc9/FiC82lwSc+ulGZHH44g==}
     engines: {node: '>=20'}
+
+  nodemailer@10.2.1:
+    resolution: {integrity: sha512-ZrDNsPFoDMwefNs7sJwrYiEJ/CG4ClJWDZv05iNJsEBWa8GRDry1QJHTJxsuTAY9eDDKjX4k+q3SxslXJOao7w==}
+    engines: {node: '>=20.0.0'}
 
   nodemon@3.1.14:
     resolution: {integrity: sha512-jakjZi93UtB3jHMWsXL68FXSAosbLfY0In5gtKq3niLSkrWznrVBzXFNOEMJUfc9+Ke7SHWoAZsiMkNP3vq6Jw==}
@@ -2578,6 +2585,8 @@ snapshots:
   node-rsa@2.0.0:
     dependencies:
       '@noble/hashes': 2.4.0
+
+  nodemailer@10.2.1: {}
 
   nodemon@3.1.14:
     dependencies:

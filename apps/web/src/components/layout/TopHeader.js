@@ -31,6 +31,10 @@ export const TopHeader = () => {
   const [templateId, setTemplateId] = useState('adr');
   const [enableAi, setEnableAi] = useState(true);
   const [aiPrompt, setAiPrompt] = useState('针对跨区域混合云部署的元数据 Raft 复制与分片路由方案设计');
+  
+  // 分享文档弹窗状态
+  const [shareModal, setShareModal] = useState({ isOpen: false, type: '', message: '', link: '' });
+  const [copyText, setCopyText] = useState('复制');
 
   const handleFormatMD = () => {
     if (docTitle && !docTitle.toLowerCase().endsWith('.md')) {
@@ -67,13 +71,20 @@ export const TopHeader = () => {
 
   // 生成分享链接交互
   const handleShare = async () => {
+    if (!currentDocId) {
+      setShareModal({ isOpen: true, type: 'error', message: '请先选择一个要分享的文档', link: '' });
+      return;
+    }
     try {
-      const res = await api.createShareLink({ targetId: 'doc_current', expiresIn: 86400 });
+      const res = await api.createShareLink({ targetId: currentDocId, expiresIn: 86400 });
       if (res.code === 200 && res.data) {
-        alert(`分享链接已生成:\n${res.data.shareUrl}`);
+        setShareModal({ isOpen: true, type: 'success', message: '分享链接已生成：', link: res.data.shareUrl });
+      } else {
+        setShareModal({ isOpen: true, type: 'error', message: res.message || '分享失败', link: '' });
       }
     } catch (err) {
       console.error('Share failed', err);
+      setShareModal({ isOpen: true, type: 'error', message: '网络请求失败', link: '' });
     }
   };
 
@@ -521,6 +532,57 @@ export const TopHeader = () => {
                   {isCreating ? '创建中...' : '立即创建 (Enter ↵)'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 分享文档弹窗 (浮层) */}
+      {shareModal.isOpen && (
+        <div style={{ position:'fixed', inset:0, backgroundColor:'rgba(15,23,42,0.5)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999 }}>
+          <div style={{ backgroundColor:'#fff', borderRadius:'12px', width:'90%', maxWidth:'420px', boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+            {/* 弹窗 Header */}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'16px 20px', borderBottom:'1px solid #e2e8f0' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
+                <div style={{ width:32, height:32, backgroundColor: shareModal.type === 'error' ? '#fef2f2' : '#eff6ff', color: shareModal.type === 'error' ? '#ef4444' : '#3b82f6', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <Share size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize:16, fontWeight:600, color:'#0f172a' }}>{shareModal.type === 'error' ? '提示' : '文档分享'}</div>
+                </div>
+              </div>
+              <X size={18} color="#94a3b8" style={{ cursor:'pointer' }} onClick={() => setShareModal({ ...shareModal, isOpen: false })} />
+            </div>
+
+            {/* 弹窗 Body */}
+            <div style={{ padding:'20px', display:'flex', flexDirection:'column', gap:'16px' }}>
+              <div style={{ fontSize:14, color:'#334155' }}>{shareModal.message}</div>
+              {shareModal.link && (
+                <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                  <input 
+                    type="text" 
+                    readOnly 
+                    value={shareModal.link} 
+                    style={{ flex:1, border:'1px solid #e2e8f0', borderRadius:6, padding:'8px 12px', fontSize:13, color:'#0f172a', backgroundColor:'#f8fafc', outline:'none' }} 
+                  />
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(shareModal.link);
+                      setCopyText('已复制');
+                      setTimeout(() => setCopyText('复制'), 2000);
+                    }} 
+                    style={{ border:'none', backgroundColor: copyText === '已复制' ? '#10b981' : '#3b82f6', color:'#fff', borderRadius:6, padding:'8px 16px', fontSize:13, cursor:'pointer', transition: 'background-color 0.2s' }}
+                  >
+                    {copyText}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 弹窗 Footer */}
+            <div style={{ display:'flex', justifyContent:'flex-end', alignItems:'center', padding:'14px 20px', backgroundColor:'#f8fafc', borderTop:'1px solid #e2e8f0' }}>
+              <button onClick={() => setShareModal({ ...shareModal, isOpen: false })} style={{ border:'none', backgroundColor:'#3b82f6', color:'#fff', fontSize:13, fontWeight:500, borderRadius:6, padding:'8px 24px', cursor:'pointer' }}>
+                确定
+              </button>
             </div>
           </div>
         </div>

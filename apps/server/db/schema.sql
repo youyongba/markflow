@@ -80,10 +80,12 @@ CREATE TABLE IF NOT EXISTS tree_nodes (
     title VARCHAR(255) NOT NULL,                   -- 节点名称 (如: 架构设计 / ADR-004-存储选型.md)
     status VARCHAR(50),                            -- 文档状态 (如: review, final, draft)
     sort_order INTEGER DEFAULT 0,                  -- 排序权重
+    creator_id INTEGER DEFAULT 1,                  -- 创建此节点的用户 ID
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-    FOREIGN KEY (parent_id) REFERENCES tree_nodes(id) ON DELETE CASCADE
+    FOREIGN KEY (parent_id) REFERENCES tree_nodes(id) ON DELETE CASCADE,
+    FOREIGN KEY (creator_id) REFERENCES users(id)
 );
 
 -- ==============================================================================

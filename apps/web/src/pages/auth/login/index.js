@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import { 
   Mail, 
   Lock, 
@@ -22,6 +23,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   
+  const router = useRouter();
   const dispatch = useAppDispatch();
 
   const handleLogin = async (e) => {
@@ -66,8 +68,13 @@ export default function Login() {
           avatarUrl: loginData.data.user.avatarUrl
         }));
         
-        // 跳转到首页
-        window.location.href = '/';
+        // 跳转到首页或重定向地址
+        const { redirect } = router.query;
+        if (redirect) {
+          window.location.href = redirect;
+        } else {
+          window.location.href = '/';
+        }
       } else {
         setError(loginData.message || '邮箱或访问凭据错误，请重试');
       }

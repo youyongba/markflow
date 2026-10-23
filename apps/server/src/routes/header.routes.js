@@ -62,17 +62,38 @@ router.get('/user-profile', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/share-link', async (req, res) => {
+router.post('/share-link', authMiddleware, async (req, res) => {
   try {
     const db = await getDb();
     const { targetId } = req.body;
+    const userId = req.user.userId;
+    
+    const protocol = req.protocol || 'http';
+    const host = req.get('host') || 'localhost:3000';
+    
+    // 检查是否已经分享过且未过期
+    const existing = await db.get('SELECT share_token FROM share_links WHERE target_id = ? AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)', [targetId]);
+    if (existing) {
+      return res.json({
+        code: 200,
+        data: {
+          shareUrl: `${protocol}://${host}/s/${existing.share_token}`
+        }
+      });
+    }
+
     const shareToken = 'share-' + Math.random().toString(36).substr(2, 6);
     
-    // ignore real insert for targetId if not integer
+    // 真实写入分享记录，默认7天有效期
+    await db.run(
+      'INSERT INTO share_links (share_token, target_id, creator_id, expires_at) VALUES (?, ?, ?, datetime("now", "+7 days"))',
+      [shareToken, targetId, userId]
+    );
+
     res.json({
       code: 200,
       data: {
-        shareUrl: `https://markflow.com/s/${shareToken}`
+        shareUrl: `${protocol}://${host}/s/${shareToken}`
       }
     });
   } catch (err) {
@@ -80,13 +101,48 @@ router.post('/share-link', async (req, res) => {
   }
 });
 
-router.post('/document', async (req, res) => {
+router.post('/share-link/:token/accept', authMiddleware, async (req, res) => {
+  try {
+    const db = await getDb();
+    const { token } = req.params;
+    const userId = req.user.userId;
+
+    // 查找分享链接
+    const shareLink = await db.get(
+      'SELECT * FROM share_links WHERE share_token = ? AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)', 
+      [token]
+    );
+
+    if (!shareLink) {
+      return res.status(404).json({ code: 404, message: '分享链接不存在或已过期' });
+    }
+
+    // 自己不能/不需要接受自己的分享
+    if (shareLink.creator_id === userId) {
+      return res.json({ code: 200, message: '这是您自己创建的文档', data: null });
+    }
+
+    // 记录用户已接受该分享
+    await db.run(
+      'INSERT OR IGNORE INTO user_share_access (user_id, share_link_id) VALUES (?, ?)',
+      [userId, shareLink.id]
+    );
+
+    res.json({ code: 200, message: '接收成功', data: null });
+  } catch (err) {
+    console.error('Accept share link error:', err);
+    res.status(500).json({ code: 500, message: 'Server error' });
+  }
+});
+
+router.post('/document', authMiddleware, async (req, res) => {
   try {
     const db = await getDb();
     const { title, parentId } = req.body;
+    const userId = req.user.userId;
     const result = await db.run(
-      'INSERT INTO tree_nodes (workspace_id, parent_id, node_type, title, status) VALUES (?, ?, "document", ?, "draft")',
-      [1, parentId || null, title]
+      'INSERT INTO tree_nodes (workspace_id, parent_id, node_type, title, status, creator_id) VALUES (?, ?, "document", ?, "draft", ?)',
+      [1, parentId || null, title, userId]
     );
     res.json({
       code: 200,
@@ -99,15 +155,16 @@ router.post('/document', async (req, res) => {
   }
 });
 
-router.post('/document/api-template', async (req, res) => {
+router.post('/document/api-template', authMiddleware, async (req, res) => {
   try {
     const db = await getDb();
     const { title, parentId } = req.body;
+    const userId = req.user.userId;
     
     // 1. 创建节点
     const result = await db.run(
-      'INSERT INTO tree_nodes (workspace_id, parent_id, node_type, title, status) VALUES (?, ?, "document", ?, "draft")',
-      [1, parentId || null, title || 'API 接口文档']
+      'INSERT INTO tree_nodes (workspace_id, parent_id, node_type, title, status, creator_id) VALUES (?, ?, "document", ?, "draft", ?)',
+      [1, parentId || null, title || 'API 接口文档', userId]
     );
     
     const documentId = result.lastID;
@@ -131,22 +188,30 @@ router.post('/document/api-template', async (req, res) => {
   }
 });
 
-router.get('/search', async (req, res) => {
+router.get('/search', authMiddleware, async (req, res) => {
   try {
     const db = await getDb();
     const { keyword } = req.query;
+    const userId = req.user.userId;
     
     if (!keyword) {
       return res.json({ code: 200, data: [] });
     }
 
-    // 搜索文档标题
+    // 搜索文档标题，过滤出自己创建的或者已经接受分享的文档
     const results = await db.all(`
       SELECT id, title, node_type as type 
       FROM tree_nodes 
-      WHERE node_type = 'document' AND title LIKE ?
+      WHERE node_type = 'document' 
+        AND title LIKE ?
+        AND (creator_id = ? OR id IN (
+          SELECT sl.target_id 
+          FROM share_links sl 
+          JOIN user_share_access usa ON sl.id = usa.share_link_id 
+          WHERE usa.user_id = ?
+        ))
       LIMIT 10
-    `, [`%${keyword}%`]);
+    `, [`%${keyword}%`, userId, userId]);
 
     const formattedData = results.map(row => ({
       id: String(row.id),

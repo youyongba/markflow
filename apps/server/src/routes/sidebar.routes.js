@@ -81,25 +81,63 @@ router.patch('/preferences', authMiddleware, async (req, res) => {
   }
 });
 
-router.get('/tree-nodes', async (req, res) => {
+router.get('/tree-nodes', authMiddleware, async (req, res) => {
   try {
     const db = await getDb();
     const { parentId } = req.query;
+    const userId = req.user.userId;
     
-    let query = 'SELECT * FROM tree_nodes WHERE ';
-    let params = [];
+    let query = `
+      WITH RECURSIVE visible_nodes AS (
+        SELECT id, parent_id, node_type, title, status, creator_id, sort_order
+        FROM tree_nodes
+        WHERE creator_id = ? OR id IN (
+          SELECT sl.target_id 
+          FROM share_links sl 
+          JOIN user_share_access usa ON sl.id = usa.share_link_id 
+          WHERE usa.user_id = ?
+        )
+        
+        UNION
+        
+        SELECT t.id, t.parent_id, t.node_type, t.title, t.status, t.creator_id, t.sort_order
+        FROM tree_nodes t
+        JOIN visible_nodes v ON t.id = v.parent_id
+      )
+      SELECT DISTINCT * FROM visible_nodes
+      WHERE `;
+    
+    let params = [userId, userId];
     if (parentId) {
       query += 'parent_id = ?';
       params.push(parentId);
     } else {
       query += 'parent_id IS NULL';
     }
+    
     query += ' ORDER BY sort_order ASC, id ASC';
 
     const nodes = await db.all(query, params);
     
     const data = await Promise.all(nodes.map(async (node) => {
-      const { count } = await db.get('SELECT COUNT(*) as count FROM tree_nodes WHERE parent_id = ?', [node.id]);
+      // 检查是否包含子节点（也需要经过相同的权限过滤）
+      const { count } = await db.get(`
+        WITH RECURSIVE visible_nodes AS (
+          SELECT id, parent_id
+          FROM tree_nodes
+          WHERE creator_id = ? OR id IN (
+            SELECT sl.target_id 
+            FROM share_links sl 
+            JOIN user_share_access usa ON sl.id = usa.share_link_id 
+            WHERE usa.user_id = ?
+          )
+          UNION
+          SELECT t.id, t.parent_id
+          FROM tree_nodes t
+          JOIN visible_nodes v ON t.id = v.parent_id
+        )
+        SELECT COUNT(DISTINCT id) as count FROM visible_nodes WHERE parent_id = ?
+      `, [userId, userId, node.id]);
       return {
         id: String(node.id),
         parentId: node.parent_id ? String(node.parent_id) : null,
@@ -112,6 +150,7 @@ router.get('/tree-nodes', async (req, res) => {
     
     res.json({ code: 200, data });
   } catch (err) {
+    console.error('Fetch tree-nodes error:', err);
     res.status(500).json({ code: 500, message: 'Server error' });
   }
 });
@@ -133,13 +172,14 @@ router.get('/bookmarks', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/tree-nodes/folder', async (req, res) => {
+router.post('/tree-nodes/folder', authMiddleware, async (req, res) => {
   try {
     const db = await getDb();
     const { title, parentId } = req.body;
+    const userId = req.user.userId;
     const result = await db.run(
-      'INSERT INTO tree_nodes (workspace_id, parent_id, node_type, title) VALUES (?, ?, "folder", ?)',
-      [1, parentId || null, title]
+      'INSERT INTO tree_nodes (workspace_id, parent_id, node_type, title, creator_id) VALUES (?, ?, "folder", ?, ?)',
+      [1, parentId || null, title, userId]
     );
     res.json({
       code: 200,
@@ -157,31 +197,35 @@ router.post('/tree-nodes/folder', async (req, res) => {
   }
 });
 
-router.put('/tree-nodes/folder/:id', async (req, res) => {
+router.put('/tree-nodes/folder/:id', authMiddleware, async (req, res) => {
   try {
     const db = await getDb();
     const { title } = req.body;
-    await db.run('UPDATE tree_nodes SET title = ? WHERE id = ? AND node_type = "folder"', [title, req.params.id]);
+    const userId = req.user.userId;
+    // 仅允许创建者修改
+    await db.run('UPDATE tree_nodes SET title = ? WHERE id = ? AND node_type = "folder" AND creator_id = ?', [title, req.params.id, userId]);
     res.json({ code: 200, message: '修改成功' });
   } catch (err) {
     res.status(500).json({ code: 500, message: 'Server error' });
   }
 });
 
-router.delete('/tree-nodes/folder/:id', async (req, res) => {
+router.delete('/tree-nodes/folder/:id', authMiddleware, async (req, res) => {
   try {
     const db = await getDb();
-    await db.run('DELETE FROM tree_nodes WHERE id = ? AND node_type = "folder"', [req.params.id]);
+    const userId = req.user.userId;
+    await db.run('DELETE FROM tree_nodes WHERE id = ? AND node_type = "folder" AND creator_id = ?', [req.params.id, userId]);
     res.json({ code: 200, message: '删除成功', data: null });
   } catch (err) {
     res.status(500).json({ code: 500, message: 'Server error' });
   }
 });
 
-router.delete('/tree-nodes/document/:id', async (req, res) => {
+router.delete('/tree-nodes/document/:id', authMiddleware, async (req, res) => {
   try {
     const db = await getDb();
-    await db.run('DELETE FROM tree_nodes WHERE id = ? AND node_type = "document"', [req.params.id]);
+    const userId = req.user.userId;
+    await db.run('DELETE FROM tree_nodes WHERE id = ? AND node_type = "document" AND creator_id = ?', [req.params.id, userId]);
     res.json({ code: 200, message: '文档已删除', data: null });
   } catch (err) {
     res.status(500).json({ code: 500, message: 'Server error' });

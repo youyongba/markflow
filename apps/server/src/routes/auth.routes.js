@@ -1,9 +1,11 @@
 const { Router } = require('express');
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const NodeRSAModule = require('node-rsa');
 const NodeRSA = NodeRSAModule.NodeRSA || NodeRSAModule;
 const { getDb } = require('../config/database');
+const { sendResetEmail } = require('../utils/mailer');
 
 const router = Router();
 const JWT_SECRET = 'markflow_secret_key';
@@ -95,17 +97,33 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/password/forgot', async (req, res) => {
-  const { email } = req.body;
-  const db = await getDb();
-  const user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
-  if (user) {
-    const resetToken = 'temp-token-from-email-link-' + Date.now();
-    await db.run(
-      'INSERT INTO password_resets (user_id, reset_token, expires_at) VALUES (?, ?, datetime("now", "+15 minutes"))',
-      [user.id, resetToken]
-    );
+  try {
+    const { email } = req.body;
+    const db = await getDb();
+    const user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
+    
+    if (user) {
+      // 生成安全的随机 Token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      await db.run(
+        'INSERT INTO password_resets (user_id, reset_token, expires_at) VALUES (?, ?, datetime("now", "+15 minutes"))',
+        [user.id, resetToken]
+      );
+      
+      // 发送包含 Token 的重置邮件
+      try {
+        await sendResetEmail(user.email, resetToken);
+      } catch (mailErr) {
+        console.error('发送邮件失败:', mailErr);
+        // 考虑到安全原因，即使邮件发送失败也不要暴漏用户是否存在，但也可以记录日志
+      }
+    }
+    // 不管用户是否存在都返回相同的信息，防止探测邮箱是否存在
+    res.json({ code: 200, message: '重置链接已发送', data: null });
+  } catch (err) {
+    console.error('找回密码出错:', err);
+    res.status(500).json({ code: 500, message: '服务器错误' });
   }
-  res.json({ code: 200, message: '重置链接已发送', data: null });
 });
 
 router.post('/password/reset', async (req, res) => {
