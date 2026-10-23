@@ -189,6 +189,7 @@ export const LeftSidebar = () => {
                 id: node.id,
                 title: node.title,
                 status: node.status || 'draft',
+                creatorName: node.creatorName
               }));
             }
           }}
@@ -241,9 +242,9 @@ export const LeftSidebar = () => {
                     title="删除文档"
                   />
                 </div>
-                {node.status && (
+                {node.status && node.status !== 'draft' && (
                   <span className={`${styles.statusBadge} ${styles[node.status] || ''}`}>
-                    {node.status === 'review' ? '评审中' : node.status === 'final' ? '定稿' : '草稿'}
+                    {node.status === 'review' ? '评审中' : node.status === 'final' ? '定稿' : ''}
                   </span>
                 )}
               </div>

@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   FileText, Bold, Italic, Heading1, Code, Link as LinkIcon, 
   Image as ImageIcon, CheckSquare, Table, Sigma, AlignLeft, Eye, Download,
-  Maximize2, Zap, Check, Clock, User, AlertTriangle, ChevronDown,
-  FileBox, FileCode2, FileType2
+  Maximize2, Minimize2, Zap, Check, Clock, User, AlertTriangle, ChevronDown,
+  FileBox, FileCode2, FileType2, Network
 } from 'lucide-react';
 import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
@@ -12,6 +12,10 @@ import 'prismjs/components/prism-go';
 import 'prismjs/themes/prism.css';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Transformer } from 'markmap-lib';
+import { Markmap } from 'markmap-view';
+import { Toolbar } from 'markmap-toolbar';
+import 'markmap-toolbar/dist/style.css';
 import styles from '../../pages/index.module.css';
 import { useSelector, useDispatch } from 'react-redux';
 import { setActiveTab, toggleSyncScroll, toggleRightSidebar } from '../../store/slices/layoutSlice';
@@ -23,6 +27,8 @@ const Copy = ({ size, ...props }) => (
     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
   </svg>
 );
+
+const transformer = new Transformer();
 
 export const EditorArea = () => {
   const dispatch = useDispatch();
@@ -49,6 +55,9 @@ export const EditorArea = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
 
+  // 5. 全屏预览状态
+  const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false);
+
   // 引用 textarea DOM 以获取光标位置
   const textareaRef = useRef(null);
   
@@ -56,6 +65,45 @@ export const EditorArea = () => {
   const leftPaneRef = useRef(null);
   const rightPaneRef = useRef(null);
   const scrollOriginRef = useRef(null); // 记录当前滚动的发起方: 'left' | 'right'
+  
+  // 脑图相关的 Ref
+  const refSvg = useRef(null);
+  const refMarkmap = useRef(null);
+  const refToolbar = useRef(null);
+
+  // 脑图渲染逻辑
+  useEffect(() => {
+    if (activeTab === 'mindmap' && refSvg.current) {
+      // 延迟初始化以确保 SVG 的宽高 (100%) 已在 DOM 中实际计算完成
+      // 避免 d3-zoom 抛出 Could not resolve relative length 的错误
+      const timer = setTimeout(() => {
+        if (!refSvg.current) return;
+        
+        if (!refMarkmap.current) {
+          refMarkmap.current = Markmap.create(refSvg.current);
+          if (refToolbar.current) {
+            refToolbar.current.innerHTML = '';
+            const toolbar = new Toolbar();
+            toolbar.attach(refMarkmap.current);
+            refToolbar.current.appendChild(toolbar.render());
+          }
+        }
+        const { root } = transformer.transform(sourceCode);
+        refMarkmap.current.setData(root);
+        refMarkmap.current.fit();
+      }, 50);
+      
+      return () => clearTimeout(timer);
+    } else if (activeTab !== 'mindmap') {
+      // 切换视图时 SVG 节点会被销毁，必须清空旧实例，否则切回时会操作已卸载的旧节点报错
+      if (refMarkmap.current) {
+        if (typeof refMarkmap.current.destroy === 'function') {
+          refMarkmap.current.destroy();
+        }
+        refMarkmap.current = null;
+      }
+    }
+  }, [activeTab, sourceCode]);
 
   // 同步滚动核心逻辑
   const handleSyncScroll = (source, target) => {
@@ -353,6 +401,12 @@ export const EditorArea = () => {
           >
             <Eye size={14} /> 只读渲染
           </div>
+          <div 
+            className={`${styles.toolbarBtn} ${styles.textBtn} ${activeTab === 'mindmap' ? styles.active : ''}`}
+            onClick={() => dispatch(setActiveTab('mindmap'))}
+          >
+            <Network size={14} /> 解析脑图
+          </div>
         </div>
 
         <div className={styles.toolbarDivider} />
@@ -534,16 +588,43 @@ export const EditorArea = () => {
           </div>
         )}
 
+        {/* Mindmap Pane */}
+        {activeTab === 'mindmap' && (
+          <div className={styles.editorPane}>
+            <div className={styles.paneHeader}>
+              <div className={styles.paneTitle}>
+                <Network size={14} color="#8b5cf6" /> 解析脑图
+              </div>
+            </div>
+            <div className={styles.paneContent} style={{ padding: 0, position: 'relative', overflow: 'hidden' }}>
+              <svg ref={refSvg} style={{ width: '100%', height: '100%' }} />
+              <div ref={refToolbar} style={{ position: 'absolute', bottom: 16, right: 16 }} />
+            </div>
+          </div>
+        )}
+
         {/* Right Pane: Preview */}
         {(activeTab === 'preview' || activeTab === 'split') && (
-          <div className={styles.editorPane}>
+          <div 
+            className={styles.editorPane} 
+            style={isPreviewFullscreen ? { position: 'fixed', inset: 0, zIndex: 9999, borderRadius: 0 } : {}}
+          >
             <div className={styles.paneHeader}>
               <div className={styles.paneTitle}>
                 <Eye size={14} color="#10b981" /> 实时排版预览 (Live HTML Output)
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#10b981' }}></div>
-                阅读宽度: 800px 最佳视野
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#10b981' }}></div>
+                  阅读宽度: 800px 最佳视野
+                </div>
+                <div 
+                  onClick={() => setIsPreviewFullscreen(!isPreviewFullscreen)}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: '4px', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#475569', transition: 'all 0.2s' }}
+                  title={isPreviewFullscreen ? "退出全屏" : "全屏预览"}
+                >
+                  {isPreviewFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                </div>
               </div>
             </div>
             <div 
@@ -558,17 +639,12 @@ export const EditorArea = () => {
             >
               <div className={styles.previewContent}>
                 <div style={{ borderBottom: '1px solid #dce9ff', paddingBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, backgroundColor: '#ffddb8', color: '#2a1700', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.04em' }}>ADR 标准规范</span>
-                    <span style={{ fontFamily: 'jetbrainsMono, monospace', fontSize: 12.5, color: '#43474f', fontWeight: 500 }}>版本 v2.4</span>
-                  </div>
                   <h1>
                     {activeDocument.title.replace('.md', '')}
                   </h1>
                   <div className={styles.previewMeta}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><User size={15} /> {activeDocument.author || 'Alex Chen (系统架构组)'}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><User size={15} /> {activeDocument.creatorName || activeDocument.author || '创作者'}</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={15} /> {activeDocument.date || new Date().toISOString().split('T')[0]}</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#30568b' }}><CheckSquare size={15} /> {activeDocument.reviewersCount || 3} 位架构师同行评审中</span>
                   </div>
                 </div>
 

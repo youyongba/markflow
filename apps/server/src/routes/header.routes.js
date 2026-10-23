@@ -138,16 +138,31 @@ router.post('/share-link/:token/accept', authMiddleware, async (req, res) => {
 router.post('/document', authMiddleware, async (req, res) => {
   try {
     const db = await getDb();
-    const { title, parentId } = req.body;
+    const { title, parentId, templateId } = req.body;
     const userId = req.user.userId;
     const result = await db.run(
       'INSERT INTO tree_nodes (workspace_id, parent_id, node_type, title, status, creator_id) VALUES (?, ?, "document", ?, "draft", ?)',
       [1, parentId || null, title, userId]
     );
+
+    const documentId = result.lastID;
+    let source = '# ' + (title || '无标题文档') + '\n\n开始编写...';
+    
+    if (templateId === 'adr') {
+      source = `# ${title || 'ADR 决策记录'}\n\n## 1. 背景与上下文\n\n## 2. 决策选项\n- 选项A:\n- 选项B:\n\n## 3. 最终决策\n\n## 4. 后果与影响\n`;
+    } else if (templateId === 'rfc') {
+      source = `# ${title || 'RFC 技术提案'}\n\n## 1. 概述 (Summary)\n\n## 2. 动机 (Motivation)\n\n## 3. 详细设计 (Detailed Design)\n\n## 4. 缺点与风险 (Drawbacks)\n\n## 5. 替代方案 (Alternatives)\n`;
+    }
+
+    await db.run(
+      'INSERT INTO document_contents (document_id, source) VALUES (?, ?)',
+      [documentId, source]
+    );
+
     res.json({
       code: 200,
       data: {
-        documentId: String(result.lastID)
+        documentId: String(documentId)
       }
     });
   } catch (err) {
@@ -200,11 +215,12 @@ router.get('/search', authMiddleware, async (req, res) => {
 
     // 搜索文档标题，过滤出自己创建的或者已经接受分享的文档
     const results = await db.all(`
-      SELECT id, title, node_type as type 
-      FROM tree_nodes 
-      WHERE node_type = 'document' 
-        AND title LIKE ?
-        AND (creator_id = ? OR id IN (
+      SELECT t.id, t.title, t.node_type as type, u.name as creator_name
+      FROM tree_nodes t
+      LEFT JOIN users u ON t.creator_id = u.id
+      WHERE t.node_type = 'document' 
+        AND t.title LIKE ?
+        AND (t.creator_id = ? OR t.id IN (
           SELECT sl.target_id 
           FROM share_links sl 
           JOIN user_share_access usa ON sl.id = usa.share_link_id 
@@ -217,6 +233,7 @@ router.get('/search', authMiddleware, async (req, res) => {
       id: String(row.id),
       title: row.title,
       type: row.type,
+      creatorName: row.creator_name,
       highlight: `找到包含 <em>${keyword}</em> 的文档`,
       url: `/workspace/docs/${row.id}`
     }));

@@ -24,11 +24,11 @@ export const TopHeader = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [docTitle, setDocTitle] = useState('ADR-005-分布式元数据同步方案.md');
+  const [docTitle, setDocTitle] = useState('');
   const [docDirectory, setDocDirectory] = useState('');
   const [treeFolders, setTreeFolders] = useState([]);
   const [frontmatter, setFrontmatter] = useState('standard');
-  const [templateId, setTemplateId] = useState('adr');
+  const [templateId, setTemplateId] = useState('blank');
   const [enableAi, setEnableAi] = useState(true);
   const [aiPrompt, setAiPrompt] = useState('针对跨区域混合云部署的元数据 Raft 复制与分片路由方案设计');
   
@@ -139,7 +139,8 @@ export const TopHeader = () => {
         dispatch(setActiveDocument({
           id: parseInt(documentId) || documentId,
           title: docTitle || '无标题文档',
-          status: 'draft'
+          status: 'draft',
+          creatorName: userProfile?.userName
         }));
 
         if (docDirectory && docDirectory !== 'root' && !expandedNodes.includes(docDirectory)) {
@@ -301,7 +302,8 @@ export const TopHeader = () => {
                     dispatch(setActiveDocument({
                       id: parseInt(item.id) || item.id,
                       title: item.title,
-                      status: 'draft' // 从搜索列表跳转暂默认为 draft，实际应由后端返回
+                      status: 'draft', // 从搜索列表跳转暂默认为 draft，实际应由后端返回
+                      creatorName: item.creatorName
                     }));
                   } else {
                     alert(`即将跳转至: ${item.url}`);
@@ -451,7 +453,7 @@ export const TopHeader = () => {
                 </div>
               </div>
 
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:'16px' }}>
                 <div>
                   <div style={{ marginBottom:8, fontSize:12, fontWeight:500, color:'#475569' }}>存储目录 (DIRECTORY PATH)</div>
                   <div style={{ display:'flex', alignItems:'center', position:'relative', border:'1px solid #e2e8f0', borderRadius:6, backgroundColor:'#f8fafc' }}>
@@ -461,17 +463,6 @@ export const TopHeader = () => {
                         <option key={folder.id} value={folder.id}>{folder.title}</option>
                       ))}
                       <option value="root">根目录 (Root)</option>
-                    </select>
-                    <ChevronDown size={14} color="#94a3b8" style={{ position:'absolute', right:12, pointerEvents:'none' }} />
-                  </div>
-                </div>
-                <div>
-                  <div style={{ marginBottom:8, fontSize:12, fontWeight:500, color:'#475569' }}>FRONTMATTER 元数据预设</div>
-                  <div style={{ display:'flex', alignItems:'center', position:'relative', border:'1px solid #e2e8f0', borderRadius:6, backgroundColor:'#f8fafc' }}>
-                    <select value={frontmatter} onChange={e => setFrontmatter(e.target.value)} style={{ width:'100%', appearance:'none', border:'none', backgroundColor:'transparent', padding:'8px 32px 8px 12px', fontSize:13, color:'#334155', outline:'none', cursor:'pointer' }}>
-                      <option value="standard">标准工程 YAML (Title, Status, Tags, Author)</option>
-                      <option value="minimal">极简 YAML (Title, Date)</option>
-                      <option value="none">不启用 Frontmatter</option>
                     </select>
                     <ChevronDown size={14} color="#94a3b8" style={{ position:'absolute', right:12, pointerEvents:'none' }} />
                   </div>

@@ -104,7 +104,9 @@ router.get('/tree-nodes', authMiddleware, async (req, res) => {
         FROM tree_nodes t
         JOIN visible_nodes v ON t.id = v.parent_id
       )
-      SELECT DISTINCT * FROM visible_nodes
+      SELECT DISTINCT v.*, u.name as creator_name 
+      FROM visible_nodes v
+      LEFT JOIN users u ON v.creator_id = u.id
       WHERE `;
     
     let params = [userId, userId];
@@ -115,7 +117,7 @@ router.get('/tree-nodes', authMiddleware, async (req, res) => {
       query += 'parent_id IS NULL';
     }
     
-    query += ' ORDER BY sort_order ASC, id ASC';
+    query += ' ORDER BY v.sort_order ASC, v.id ASC';
 
     const nodes = await db.all(query, params);
     
@@ -144,6 +146,7 @@ router.get('/tree-nodes', authMiddleware, async (req, res) => {
         type: node.node_type,
         title: node.title,
         status: node.status,
+        creatorName: node.creator_name,
         hasChildren: count > 0
       };
     }));
