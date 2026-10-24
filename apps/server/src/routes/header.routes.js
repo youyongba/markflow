@@ -26,8 +26,6 @@ router.get('/context', async (req, res) => {
     res.json({
       code: 200,
       data: {
-        workspaceName: 'Engineering Wiki',
-        branchOrTag: 'main',
         paths: paths
       }
     });

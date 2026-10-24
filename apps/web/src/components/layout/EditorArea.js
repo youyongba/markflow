@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
-  FileText, Bold, Italic, Heading1, Code, Link as LinkIcon, 
+  FileText, Bold, Italic, Heading1, Heading2, Heading3, Heading4, Heading5, Heading6, Code, Link as LinkIcon, 
   Image as ImageIcon, CheckSquare, Table, Sigma, AlignLeft, Eye, Download,
   Maximize2, Minimize2, Zap, Check, Clock, User, AlertTriangle, ChevronDown,
-  FileBox, FileCode2, FileType2, Network
+  FileBox, FileCode2, FileType2, Network, Strikethrough, Quote, List, ListOrdered, Minus
 } from 'lucide-react';
 import Editor from 'react-simple-code-editor';
 import Prism from 'prismjs';
@@ -54,6 +54,9 @@ export const EditorArea = () => {
   // 4. 导出状态
   const [isExporting, setIsExporting] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+
+  // 标题下拉菜单状态
+  const [showHeadingMenu, setShowHeadingMenu] = useState(false);
 
   // 5. 全屏预览状态
   const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false);
@@ -180,9 +183,49 @@ export const EditorArea = () => {
         insertedText = `*${selectedText || '斜体文本'}*`;
         newCursorPos = selectedText ? start + insertedText.length : start + 1;
         break;
-      case 'heading':
+      case 'strikethrough':
+        insertedText = `~~${selectedText || '删除线文本'}~~`;
+        newCursorPos = selectedText ? start + insertedText.length : start + 2;
+        break;
+      case 'h1':
         insertedText = `\n# ${selectedText || '一级标题'}\n`;
         newCursorPos = selectedText ? start + insertedText.length : start + 3;
+        break;
+      case 'h2':
+        insertedText = `\n## ${selectedText || '二级标题'}\n`;
+        newCursorPos = selectedText ? start + insertedText.length : start + 4;
+        break;
+      case 'h3':
+        insertedText = `\n### ${selectedText || '三级标题'}\n`;
+        newCursorPos = selectedText ? start + insertedText.length : start + 5;
+        break;
+      case 'h4':
+        insertedText = `\n#### ${selectedText || '四级标题'}\n`;
+        newCursorPos = selectedText ? start + insertedText.length : start + 6;
+        break;
+      case 'h5':
+        insertedText = `\n##### ${selectedText || '五级标题'}\n`;
+        newCursorPos = selectedText ? start + insertedText.length : start + 7;
+        break;
+      case 'h6':
+        insertedText = `\n###### ${selectedText || '六级标题'}\n`;
+        newCursorPos = selectedText ? start + insertedText.length : start + 8;
+        break;
+      case 'quote':
+        insertedText = `\n> ${selectedText || '引用文本'}\n`;
+        newCursorPos = selectedText ? start + insertedText.length : start + 3;
+        break;
+      case 'list-ul':
+        insertedText = `\n- ${selectedText || '列表项'}\n`;
+        newCursorPos = selectedText ? start + insertedText.length : start + 3;
+        break;
+      case 'list-ol':
+        insertedText = `\n1. ${selectedText || '列表项'}\n`;
+        newCursorPos = selectedText ? start + insertedText.length : start + 4;
+        break;
+      case 'hr':
+        insertedText = `\n---\n`;
+        newCursorPos = start + insertedText.length;
         break;
       case 'code':
         if (selectedText.includes('\n')) {
@@ -414,15 +457,72 @@ export const EditorArea = () => {
         <div className={styles.toolbarGroup}>
           <div className={styles.toolbarBtn} onClick={() => handleFormat('bold')} title="加粗"><Bold size={14} /></div>
           <div className={styles.toolbarBtn} onClick={() => handleFormat('italic')} title="斜体"><Italic size={14} /></div>
-          <div className={styles.toolbarBtn} onClick={() => handleFormat('heading')} title="标题"><Heading1 size={14} /></div>
+          <div className={styles.toolbarBtn} onClick={() => handleFormat('strikethrough')} title="删除线"><Strikethrough size={14} /></div>
+          <div className={styles.toolbarDivider} />
+          <div style={{ position: 'relative' }}>
+            <div 
+              className={`${styles.toolbarBtn}`} 
+              onClick={() => setShowHeadingMenu(!showHeadingMenu)}
+              title="标题"
+            >
+              <Heading1 size={14} /> <ChevronDown size={12} style={{ marginLeft: 2 }} />
+            </div>
+            
+            {showHeadingMenu && (
+              <>
+                <div 
+                  style={{ position: 'fixed', inset: 0, zIndex: 10 }} 
+                  onClick={() => setShowHeadingMenu(false)}
+                />
+                <div style={{ 
+                  position: 'absolute', 
+                  top: '100%', 
+                  left: 0, 
+                  marginTop: 4, 
+                  backgroundColor: 'white', 
+                  borderRadius: 8, 
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0,0,0,0.05)',
+                  zIndex: 20,
+                  width: 130,
+                  overflow: 'hidden'
+                }}>
+                  {[
+                    { type: 'h1', label: '一级标题', icon: Heading1 },
+                    { type: 'h2', label: '二级标题', icon: Heading2 },
+                    { type: 'h3', label: '三级标题', icon: Heading3 },
+                    { type: 'h4', label: '四级标题', icon: Heading4 },
+                    { type: 'h5', label: '五级标题', icon: Heading5 },
+                    { type: 'h6', label: '六级标题', icon: Heading6 },
+                  ].map(item => (
+                    <div 
+                      key={item.type}
+                      style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', fontSize: 13, color: '#334155' }}
+                      onClick={() => {
+                        handleFormat(item.type);
+                        setShowHeadingMenu(false);
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <item.icon size={14} /> {item.label}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          <div className={styles.toolbarDivider} />
+          <div className={styles.toolbarBtn} onClick={() => handleFormat('quote')} title="引用"><Quote size={14} /></div>
           <div className={styles.toolbarBtn} onClick={() => handleFormat('code')} title="代码"><Code size={14} /></div>
           <div className={styles.toolbarBtn} onClick={() => handleFormat('link')} title="超链接"><LinkIcon size={14} /></div>
           <div className={styles.toolbarBtn} onClick={() => handleFormat('image')} title="图片"><ImageIcon size={14} /></div>
+          <div className={styles.toolbarDivider} />
+          <div className={styles.toolbarBtn} onClick={() => handleFormat('list-ul')} title="无序列表"><List size={14} /></div>
+          <div className={styles.toolbarBtn} onClick={() => handleFormat('list-ol')} title="有序列表"><ListOrdered size={14} /></div>
           <div className={styles.toolbarBtn} onClick={() => handleFormat('task')} title="任务列表"><CheckSquare size={14} /></div>
           <div className={styles.toolbarBtn} onClick={() => handleFormat('table')} title="表格"><Table size={14} /></div>
+          <div className={styles.toolbarBtn} onClick={() => handleFormat('hr')} title="分割线"><Minus size={14} /></div>
           <div className={styles.toolbarBtn} onClick={() => handleFormat('math')} title="数学公式"><Sigma size={14} /></div>
-          <div className={styles.toolbarDivider} />
-          <div className={styles.toolbarBtn} onClick={handleRequestAi} title="AI 润色选中文本" style={{ color: '#4f46e5' }}><Zap size={14} /></div>
         </div>
 
         <div style={{ flex: 1 }} />
@@ -434,14 +534,6 @@ export const EditorArea = () => {
             onClick={() => dispatch(toggleSyncScroll())}
           >
             双向同步滚动: <span style={{ color: isSyncScroll ? '#10b981' : '#94a3b8' }}>{isSyncScroll ? '开' : '关'}</span>
-          </div>
-          <div className={styles.toolbarDivider} />
-          <div 
-            className={`${styles.toolbarBtn} ${styles.textBtn}`} 
-            style={{ fontSize: 12, cursor: 'pointer' }}
-            onClick={() => dispatch(toggleRightSidebar())}
-          >
-            <Code size={14} /> 元数据 (YAML)
           </div>
           <div className={styles.toolbarDivider} />
           <div style={{ position: 'relative' }}>
@@ -639,9 +731,6 @@ export const EditorArea = () => {
             >
               <div className={styles.previewContent}>
                 <div style={{ borderBottom: '1px solid #dce9ff', paddingBottom: 8 }}>
-                  <h1>
-                    {activeDocument.title.replace('.md', '')}
-                  </h1>
                   <div className={styles.previewMeta}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><User size={15} /> {activeDocument.creatorName || activeDocument.author || '创作者'}</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Clock size={15} /> {activeDocument.date || new Date().toISOString().split('T')[0]}</span>

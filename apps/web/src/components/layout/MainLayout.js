@@ -5,7 +5,6 @@ import { LeftSidebar } from './LeftSidebar/index';
 import { TopHeader } from './TopHeader';
 import { EditorArea } from './EditorArea';
 import { GraphArea } from './GraphArea';
-import { RightSidebar } from './RightSidebar';
 import { useSelector } from 'react-redux';
 
 export const MainLayout = () => {
@@ -25,9 +24,6 @@ export const MainLayout = () => {
         <TopHeader />
         {activeNavItem === 'graph' ? <GraphArea /> : <EditorArea />}
       </div>
-
-      {/* Right Sidebar */}
-      {activeNavItem !== 'graph' && isRightSidebarOpen && <RightSidebar />}
     </div>
   );
 };

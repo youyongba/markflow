@@ -68,6 +68,16 @@ export const deleteFolder = async (id) => {
 };
 
 // 8. 删除文档
+export const renameDocument = async (id, title) => {
+  const baseUrl = getBaseUrl();
+  const res = await fetch(`${baseUrl}/tree-nodes/document/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title })
+  });
+  return res.json();
+};
+
 export const deleteDocument = async (id) => {
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}/tree-nodes/document/${id}`;

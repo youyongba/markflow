@@ -15,7 +15,7 @@ const sendResetEmail = async (toEmail, resetToken) => {
   const resetLink = `http://localhost:3000/auth/reset-password?token=${resetToken}`;
   
   const mailOptions = {
-    from: process.env.SMTP_FROM || 'TVTrade <55377146@qq.com>',
+    from: process.env.SMTP_FROM || 'xiaohong <55377146@qq.com>',
     to: toEmail,
     subject: '【MarkFlow】密码重置请求',
     html: `

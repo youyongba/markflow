@@ -47,7 +47,7 @@ export const TopHeader = () => {
     api.fetchContext(currentDocId).then(res => {
       if (res.code === 200) setHeaderContext(res.data);
     }).catch(err => console.error('Failed to fetch header context', err));
-  }, [currentDocId]);
+  }, [currentDocId, activeDocument?.title]);
 
   // 初始化拉取用户信息和目录树
   useEffect(() => {
@@ -206,12 +206,13 @@ export const TopHeader = () => {
   // 渲染动态面包屑
   const renderBreadcrumbText = () => {
     if (!headerContext) return 'Loading...';
-    const parts = [
-      headerContext.workspaceName,
-      headerContext.branchOrTag,
-      ...(headerContext.paths?.map(p => p.title) || [])
-    ].filter(Boolean);
-    return parts.join(' / ');
+    // 如果后端返回了 paths 并且不为空，则优先使用真实的文档路径
+    if (headerContext.paths && headerContext.paths.length > 0) {
+      const parts = headerContext.paths.map(p => p.title);
+      return parts.join(' / ');
+    }
+    // 兜底方案
+    return activeDocument ? activeDocument.title : '工作区';
   };
 
   const handleLogout = async () => {
@@ -251,9 +252,13 @@ export const TopHeader = () => {
             onClick={() => dispatch(toggleLeftSidebar())} 
           />
         )}
-        <Folder size={16} color="#3b82f6" />
-        <span>{renderBreadcrumbText()}</span>
-        <ChevronDown size={14} />
+        {currentDocId && (
+          <>
+            <Folder size={16} color="#3b82f6" />
+            <span>{renderBreadcrumbText()}</span>
+            <ChevronDown size={14} />
+          </>
+        )}
       </div>
 
       <div className={styles.searchBar} style={{ position: 'relative' }}>

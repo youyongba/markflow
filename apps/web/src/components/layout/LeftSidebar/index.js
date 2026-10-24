@@ -171,6 +171,37 @@ export const LeftSidebar = () => {
     }
   };
 
+  // 修改文档名称
+  const handleRenameDocument = async (e, docId, oldTitle) => {
+    e.stopPropagation();
+    const newTitle = window.prompt('请输入新的文档名称：', oldTitle);
+    if (!newTitle || !newTitle.trim() || newTitle.trim() === oldTitle) return;
+
+    try {
+      const res = await api.renameDocument(docId, newTitle.trim());
+      if (res.code === 200) {
+        // 重新拉取整棵树来刷新数据
+        const treeRes = await api.fetchTreeNodes();
+        if (treeRes.code === 200 && treeRes.data) {
+          dispatch(setTreeNodes(treeRes.data));
+        }
+        
+        // 如果重命名的是当前激活的文档，实时同步更新全局状态
+        if (activeDocument?.id === docId) {
+          dispatch(setActiveDocument({
+            ...activeDocument,
+            title: newTitle.trim()
+          }));
+        }
+      } else {
+        alert(res.message || '重命名文档失败');
+      }
+    } catch (err) {
+      console.error('Rename doc failed', err);
+      alert('重命名文档失败');
+    }
+  };
+
   // 递归渲染树节点
   const renderTree = (parentId = null, level = 0) => {
     const nodes = treeNodes.filter(n => n.parentId === parentId);
@@ -235,6 +266,12 @@ export const LeftSidebar = () => {
             {node.type === 'document' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div className={styles.actionIconGroup} style={{ display: 'flex', gap: '4px' }}>
+                  <Edit2 
+                    size={14} 
+                    style={{ color: '#94a3b8', cursor: 'pointer' }}
+                    onClick={(e) => handleRenameDocument(e, node.id, node.title)} 
+                    title="重命名文档"
+                  />
                   <Trash2 
                     size={14} 
                     style={{ color: '#ef4444', cursor: 'pointer' }}
@@ -268,47 +305,6 @@ export const LeftSidebar = () => {
         <AlignLeft size={18} color="#64748b" style={{ cursor: 'pointer' }} onClick={() => dispatch(toggleLeftSidebar())} />
       </div>
 
-      <div className={styles.sidebarSection}>
-        <div className={styles.sidebarTitle} onClick={() => handleToggleNode('doc-space', false)} style={{ cursor: 'pointer' }}>
-          <span>文档空间</span>
-          {isExpanded('doc-space') ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </div>
-        {isExpanded('doc-space') && (
-          <>
-            <div 
-              className={`${styles.navItem} ${activeNavItem === 'files' ? styles.active : ''}`}
-              onClick={() => handleNavClick('files')}
-            >
-              <Folder size={16} /> 文档库 (Files) {filesCount > 0 && <span className={styles.navBadge}>{filesCount}</span>}
-            </div>
-            <div 
-              className={`${styles.navItem} ${activeNavItem === 'graph' ? styles.active : ''}`}
-              onClick={() => handleNavClick('graph')}
-            >
-              <GitGraph size={16} /> 关系图谱 (Graph)
-            </div>
-            <div 
-              className={`${styles.navItem} ${activeNavItem === 'search' ? styles.active : ''}`}
-              onClick={() => handleNavClick('search')}
-            >
-              <Search size={16} /> 全局搜索 (Search)
-            </div>
-            <div 
-              className={`${styles.navItem} ${activeNavItem === 'tags' ? styles.active : ''}`}
-              onClick={() => handleNavClick('tags')}
-            >
-              <Tags size={16} /> 知识标签 (Tags) {tagsCount > 0 && <span className={styles.navBadge}>{tagsCount}</span>}
-            </div>
-            <div 
-              className={`${styles.navItem} ${activeNavItem === 'settings' ? styles.active : ''}`}
-              onClick={() => handleNavClick('settings')}
-            >
-              <Settings size={16} /> 系统设置 (Settings)
-            </div>
-          </>
-        )}
-      </div>
-
       <div className={styles.sidebarSection} style={{ flex: 1, overflow: 'auto' }}>
         <div className={styles.sidebarTitle}>
           <span>目录树结构</span>
@@ -316,18 +312,6 @@ export const LeftSidebar = () => {
         </div>
         
         {renderTree(null, 0)}
-      </div>
-
-      <div className={styles.sidebarSection} style={{ borderTop: '1px solid #e2e8f0' }}>
-        <div className={styles.sidebarTitle} onClick={() => handleToggleNode('bookmarks', false)} style={{ cursor: 'pointer' }}>
-          <span>常驻书签 (BOOKMARKS)</span>
-          {isExpanded('bookmarks') ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </div>
-        {isExpanded('bookmarks') && bookmarks.map(bookmark => (
-          <div className={styles.treeNode} key={bookmark.id}>
-            <span style={{ color: bookmark.iconColor || '#f59e0b' }}>★</span> {bookmark.title}
-          </div>
-        ))}
       </div>
     </div>
   );

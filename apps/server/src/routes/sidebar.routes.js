@@ -213,6 +213,19 @@ router.put('/tree-nodes/folder/:id', authMiddleware, async (req, res) => {
   }
 });
 
+router.put('/tree-nodes/document/:id', authMiddleware, async (req, res) => {
+  try {
+    const db = await getDb();
+    const { title } = req.body;
+    const userId = req.user.userId;
+    // 仅允许创建者修改文档标题
+    await db.run('UPDATE tree_nodes SET title = ? WHERE id = ? AND node_type = "document" AND creator_id = ?', [title, req.params.id, userId]);
+    res.json({ code: 200, message: '修改成功' });
+  } catch (err) {
+    res.status(500).json({ code: 500, message: 'Server error' });
+  }
+});
+
 router.delete('/tree-nodes/folder/:id', authMiddleware, async (req, res) => {
   try {
     const db = await getDb();
