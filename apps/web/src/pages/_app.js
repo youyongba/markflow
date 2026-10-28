@@ -17,7 +17,16 @@ if (typeof window !== 'undefined' && !window.__fetchPatched) {
         'Authorization': token ? `Bearer ${token}` : ''
       };
     }
-    return originalFetch(resource, config);
+    
+    const response = await originalFetch(resource, config);
+    
+    // 如果返回 401 且不是在登录页，则跳转到登录页
+    if (response.status === 401 && window.location.pathname !== '/auth/login') {
+      localStorage.removeItem('token');
+      window.location.href = '/auth/login';
+    }
+    
+    return response;
   };
 }
 
