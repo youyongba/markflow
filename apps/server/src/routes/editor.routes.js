@@ -1,12 +1,32 @@
 const { Router } = require('express');
 const { getDb } = require('../config/database');
+const authMiddleware = require('../middleware/auth.middleware');
 
 const router = Router();
 
-router.get('/:documentId/content', async (req, res) => {
+router.get('/:documentId/content', authMiddleware, async (req, res) => {
   try {
     const db = await getDb();
     const { documentId } = req.params;
+    const userId = req.user.userId;
+
+    // 检查访问权限
+    const node = await db.get(`
+      SELECT id FROM tree_nodes 
+      WHERE id = ? AND (
+        creator_id = ? OR id IN (
+          SELECT sl.target_id 
+          FROM share_links sl 
+          JOIN user_share_access usa ON sl.id = usa.share_link_id 
+          WHERE usa.user_id = ?
+        )
+      )
+    `, [documentId, userId, userId]);
+
+    if (!node) {
+      return res.status(403).json({ code: 403, message: '无权限访问此文档' });
+    }
+
     const content = await db.get('SELECT * FROM document_contents WHERE document_id = ?', [documentId]);
     
     if (content) {
@@ -31,13 +51,23 @@ router.get('/:documentId/content', async (req, res) => {
   }
 });
 
-router.put('/:documentId/content', async (req, res) => {
+router.put('/:documentId/content', authMiddleware, async (req, res) => {
   try {
     const db = await getDb();
     const { documentId } = req.params;
     const { source } = req.body;
+    const userId = req.user.userId;
     
-    // ignore non-integer documentId for mock records
+    // 检查修改权限（只读权限不应该能保存）
+    const node = await db.get('SELECT creator_id FROM tree_nodes WHERE id = ?', [documentId]);
+    if (!node) {
+      return res.status(404).json({ code: 404, message: '文档不存在' });
+    }
+
+    if (node.creator_id !== userId) {
+      return res.status(403).json({ code: 403, message: '他人分享的文档为只读，无权限保存修改' });
+    }
+
     if (!isNaN(parseInt(documentId))) {
       const existing = await db.get('SELECT * FROM document_contents WHERE document_id = ?', [documentId]);
       if (existing) {

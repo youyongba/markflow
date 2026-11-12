@@ -24,6 +24,8 @@ if (typeof window !== 'undefined' && !window.__fetchPatched) {
     if (response.status === 401 && window.location.pathname !== '/auth/login') {
       localStorage.removeItem('token');
       window.location.href = '/auth/login';
+      // 返回一个永远不 resolve 的 Promise，阻断后续执行，防止在跳转前触发 React 渲染报错
+      return new Promise(() => {});
     }
     
     return response;

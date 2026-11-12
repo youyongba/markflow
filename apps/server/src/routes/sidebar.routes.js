@@ -180,6 +180,17 @@ router.post('/tree-nodes/folder', authMiddleware, async (req, res) => {
     const db = await getDb();
     const { title, parentId } = req.body;
     const userId = req.user.userId;
+
+    if (parentId) {
+      const parentNode = await db.get('SELECT creator_id FROM tree_nodes WHERE id = ? AND node_type = "folder"', [parentId]);
+      if (!parentNode) {
+        return res.status(404).json({ code: 404, message: '父目录不存在' });
+      }
+      if (parentNode.creator_id !== userId) {
+        return res.status(403).json({ code: 403, message: '无权限在他人分享的目录下新建' });
+      }
+    }
+
     const result = await db.run(
       'INSERT INTO tree_nodes (workspace_id, parent_id, node_type, title, creator_id) VALUES (?, ?, "folder", ?, ?)',
       [1, parentId || null, title, userId]
@@ -189,7 +200,7 @@ router.post('/tree-nodes/folder', authMiddleware, async (req, res) => {
       message: '创建成功',
       data: {
         id: String(result.lastID),
-        parentId: parentId || null,
+        parentId: parentId ? String(parentId) : null,
         type: 'folder',
         title,
         hasChildren: false
@@ -205,8 +216,18 @@ router.put('/tree-nodes/folder/:id', authMiddleware, async (req, res) => {
     const db = await getDb();
     const { title } = req.body;
     const userId = req.user.userId;
-    // 仅允许创建者修改
-    await db.run('UPDATE tree_nodes SET title = ? WHERE id = ? AND node_type = "folder" AND creator_id = ?', [title, req.params.id, userId]);
+    const folderId = req.params.id;
+
+    const node = await db.get('SELECT creator_id FROM tree_nodes WHERE id = ? AND node_type = "folder"', [folderId]);
+    if (!node) {
+      return res.status(404).json({ code: 404, message: '文件夹不存在' });
+    }
+
+    if (node.creator_id !== userId) {
+      return res.status(403).json({ code: 403, message: '无权限重命名此文件夹' });
+    }
+
+    await db.run('UPDATE tree_nodes SET title = ? WHERE id = ?', [title, folderId]);
     res.json({ code: 200, message: '修改成功' });
   } catch (err) {
     res.status(500).json({ code: 500, message: 'Server error' });
@@ -218,8 +239,18 @@ router.put('/tree-nodes/document/:id', authMiddleware, async (req, res) => {
     const db = await getDb();
     const { title } = req.body;
     const userId = req.user.userId;
-    // 仅允许创建者修改文档标题
-    await db.run('UPDATE tree_nodes SET title = ? WHERE id = ? AND node_type = "document" AND creator_id = ?', [title, req.params.id, userId]);
+    const docId = req.params.id;
+
+    const node = await db.get('SELECT creator_id FROM tree_nodes WHERE id = ? AND node_type = "document"', [docId]);
+    if (!node) {
+      return res.status(404).json({ code: 404, message: '文档不存在' });
+    }
+
+    if (node.creator_id !== userId) {
+      return res.status(403).json({ code: 403, message: '无权限重命名此文档' });
+    }
+
+    await db.run('UPDATE tree_nodes SET title = ? WHERE id = ?', [title, docId]);
     res.json({ code: 200, message: '修改成功' });
   } catch (err) {
     res.status(500).json({ code: 500, message: 'Server error' });
@@ -230,7 +261,39 @@ router.delete('/tree-nodes/folder/:id', authMiddleware, async (req, res) => {
   try {
     const db = await getDb();
     const userId = req.user.userId;
-    await db.run('DELETE FROM tree_nodes WHERE id = ? AND node_type = "folder" AND creator_id = ?', [req.params.id, userId]);
+    const folderId = req.params.id;
+
+    const node = await db.get('SELECT creator_id FROM tree_nodes WHERE id = ? AND node_type = "folder"', [folderId]);
+    if (!node) {
+      return res.status(404).json({ code: 404, message: '文件夹不存在' });
+    }
+
+    if (node.creator_id === userId) {
+      // 自己的，彻底删除
+      await db.run('DELETE FROM tree_nodes WHERE id = ?', [folderId]);
+    } else {
+      // 别人分享的，不仅要移除直接分享给这个文件夹的记录，还要移除分享给其内部所有子节点的记录
+      const result = await db.run(`
+        DELETE FROM user_share_access 
+        WHERE user_id = ? AND share_link_id IN (
+          SELECT sl.id 
+          FROM share_links sl
+          JOIN (
+            WITH RECURSIVE descendants AS (
+              SELECT id FROM tree_nodes WHERE id = ?
+              UNION ALL
+              SELECT t.id FROM tree_nodes t JOIN descendants d ON t.parent_id = d.id
+            )
+            SELECT id FROM descendants
+          ) d ON sl.target_id = d.id
+        )
+      `, [userId, folderId]);
+
+      if (result.changes === 0) {
+        return res.status(403).json({ code: 403, message: '无权限删除此文件夹或该文件夹未分享给您' });
+      }
+    }
+
     res.json({ code: 200, message: '删除成功', data: null });
   } catch (err) {
     res.status(500).json({ code: 500, message: 'Server error' });
@@ -241,7 +304,28 @@ router.delete('/tree-nodes/document/:id', authMiddleware, async (req, res) => {
   try {
     const db = await getDb();
     const userId = req.user.userId;
-    await db.run('DELETE FROM tree_nodes WHERE id = ? AND node_type = "document" AND creator_id = ?', [req.params.id, userId]);
+    const docId = req.params.id;
+
+    const node = await db.get('SELECT creator_id FROM tree_nodes WHERE id = ? AND node_type = "document"', [docId]);
+    if (!node) {
+      return res.status(404).json({ code: 404, message: '文档不存在' });
+    }
+
+    if (node.creator_id === userId) {
+      await db.run('DELETE FROM tree_nodes WHERE id = ?', [docId]);
+    } else {
+      const result = await db.run(`
+        DELETE FROM user_share_access 
+        WHERE user_id = ? AND share_link_id IN (
+          SELECT id FROM share_links WHERE target_id = ?
+        )
+      `, [userId, docId]);
+
+      if (result.changes === 0) {
+        return res.status(403).json({ code: 403, message: '无权限删除此文档或该文档未分享给您' });
+      }
+    }
+
     res.json({ code: 200, message: '文档已删除', data: null });
   } catch (err) {
     res.status(500).json({ code: 500, message: 'Server error' });

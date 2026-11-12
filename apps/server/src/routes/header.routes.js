@@ -138,6 +138,17 @@ router.post('/document', authMiddleware, async (req, res) => {
     const db = await getDb();
     const { title, parentId, templateId } = req.body;
     const userId = req.user.userId;
+
+    if (parentId) {
+      const parentNode = await db.get('SELECT creator_id FROM tree_nodes WHERE id = ? AND node_type = "folder"', [parentId]);
+      if (!parentNode) {
+        return res.status(404).json({ code: 404, message: '父目录不存在' });
+      }
+      if (parentNode.creator_id !== userId) {
+        return res.status(403).json({ code: 403, message: '无权限在他人分享的目录下新建' });
+      }
+    }
+
     const result = await db.run(
       'INSERT INTO tree_nodes (workspace_id, parent_id, node_type, title, status, creator_id) VALUES (?, ?, "document", ?, "draft", ?)',
       [1, parentId || null, title, userId]
