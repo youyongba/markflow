@@ -460,6 +460,8 @@ document.addEventListener('click', function (e) {
   /* 与应用内 .layout 的字体保持一致，避免导出后字体回退不同 */
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
   @page { margin: 12mm; }
+  /* PDF 为静态文档，复制按钮不可执行，导出 PDF 时隐藏；HTML 包保留 */
+  ${format === 'pdf' ? '.customCodeBlock button { display: none !important; }' : ''}
 </style>
 </head>
 <body>
