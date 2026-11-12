@@ -18,7 +18,7 @@ import { Toolbar } from 'markmap-toolbar';
 import 'markmap-toolbar/dist/style.css';
 import styles from '../../pages/index.module.css';
 import { useSelector, useDispatch } from 'react-redux';
-import { setActiveTab, toggleSyncScroll, toggleRightSidebar } from '../../store/slices/layoutSlice';
+import { setActiveTab, toggleSyncScroll, toggleRightSidebar, setDocumentSource } from '../../store/slices/layoutSlice';
 import * as api from '../../services/api/editor';
 
 const Copy = ({ size, ...props }) => (
@@ -30,9 +30,16 @@ const Copy = ({ size, ...props }) => (
 
 const transformer = new Transformer();
 
+// 生成与 Markdown 锚点链接匹配的 slug（保留中英文、数字、_ 和 -，去除标点，空格转 -）
+const slugify = (text) => String(text || '')
+  .trim()
+  .toLowerCase()
+  .replace(/[^\p{L}\p{N}\s_-]/gu, '')
+  .replace(/\s+/g, '-');
+
 export const EditorArea = () => {
   const dispatch = useDispatch();
-  const { activeTab, isSyncScroll, activeDocument } = useSelector(state => state.layout);
+  const { activeTab, isSyncScroll, activeDocument, headingNavigation } = useSelector(state => state.layout);
   const currentDocId = activeDocument?.id;
 
   // 1. 文档源码状态
@@ -68,6 +75,17 @@ export const EditorArea = () => {
   const leftPaneRef = useRef(null);
   const rightPaneRef = useRef(null);
   const scrollOriginRef = useRef(null); // 记录当前滚动的发起方: 'left' | 'right'
+  const syncSuspendRef = useRef(false); // 标题跳转期间暂停双向同步滚动，避免与目标滚动互相覆盖
+
+  // 将预览滚动到指定标题元素（供右侧大纲跳转和正文锚点链接共用）
+  const scrollPreviewToElement = (target) => {
+    const scroller = rightPaneRef.current;
+    if (!scroller || !target) return;
+    syncSuspendRef.current = true;
+    setTimeout(() => { syncSuspendRef.current = false; }, 900);
+    const top = target.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+    scroller.scrollTo({ top: Math.max(0, top - 12), behavior: 'smooth' });
+  };
   
   // 脑图相关的 Ref
   const refSvg = useRef(null);
@@ -110,6 +128,7 @@ export const EditorArea = () => {
 
   // 同步滚动核心逻辑
   const handleSyncScroll = (source, target) => {
+    if (syncSuspendRef.current) return;
     if (!isSyncScroll || activeTab !== 'split' || !source || !target) return;
     
     const sourceScrollable = source.scrollHeight - source.clientHeight;
@@ -123,6 +142,55 @@ export const EditorArea = () => {
     target.scrollTop = percentage * targetScrollable;
   };
 
+  // 将源码同步到 Redux，供右侧导航目录实时解析
+  useEffect(() => {
+    dispatch(setDocumentSource(sourceCode));
+  }, [sourceCode, dispatch]);
+
+  // 保存最新的视图状态，供标题跳转事件使用（避免把 sourceCode 加入跳转 effect 的依赖）
+  const latestViewRef = useRef({ activeTab, sourceCode });
+  latestViewRef.current = { activeTab, sourceCode };
+
+  // 响应右侧导航目录的标题跳转
+  useEffect(() => {
+    if (!headingNavigation) return;
+    const { line, index } = headingNavigation;
+    const { activeTab: tab, sourceCode: code } = latestViewRef.current;
+
+    // 跳转期间暂停双向同步滚动，待平滑滚动结束后恢复
+    syncSuspendRef.current = true;
+    setTimeout(() => { syncSuspendRef.current = false; }, 900);
+
+    const scrollPreview = () => {
+      const scroller = rightPaneRef.current;
+      if (!scroller) return;
+      const headings = scroller.querySelectorAll('.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6');
+      scrollPreviewToElement(headings[index]);
+    };
+
+    const scrollSource = () => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+      const lines = code.split('\n');
+      const offset = lines.slice(0, line).reduce((sum, l) => sum + l.length + 1, 0);
+      textarea.focus();
+      textarea.setSelectionRange(offset, offset + (lines[line] || '').length);
+      if (leftPaneRef.current) {
+        // 编辑器行高：fontSize 14 * lineHeight 1.6
+        leftPaneRef.current.scrollTo({ top: Math.max(0, line * 22.4 - 40), behavior: 'smooth' });
+      }
+    };
+
+    if (tab === 'mindmap') {
+      // 脑图视图没有标题锚点，先切到预览再跳转
+      dispatch(setActiveTab('preview'));
+      setTimeout(scrollPreview, 150);
+      return;
+    }
+    if (tab === 'preview' || tab === 'split') scrollPreview();
+    if (tab === 'source' || tab === 'split') scrollSource();
+  }, [headingNavigation, dispatch]);
+
   // 初始化拉取文档源码
   useEffect(() => {
     if (!currentDocId) {
@@ -130,6 +198,7 @@ export const EditorArea = () => {
       setLastSavedAt('');
       return;
     }
+    dispatch(setDocumentSource('')); // 切换文档时先清空旧大纲
     api.fetchContent(currentDocId).then(res => {
       if (res.code === 200 && res.data) {
         setSourceCode(res.data.source || '');
@@ -743,6 +812,34 @@ export const EditorArea = () => {
                     components={{
                       // 允许渲染部分 HTML 标签以支持行内样式
                       span: ({node, ...props}) => <span {...props} />,
+                      // 正文内的锚点链接（如目录索引 [xxx](#xxx)）：点击平滑滚动到对应标题
+                      a({node, href, children, ...props}) {
+                        if (href && href.startsWith('#')) {
+                          return (
+                            <a
+                              {...props}
+                              href={href}
+                              style={{ color: '#2563eb', cursor: 'pointer' }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                let anchor = href.slice(1);
+                                try { anchor = decodeURIComponent(anchor); } catch (err) {}
+                                const slug = slugify(anchor);
+                                const container = rightPaneRef.current;
+                                if (!container || !slug) return;
+                                const headingEls = Array.from(container.querySelectorAll('.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6'));
+                                // 先精确匹配，再兼容被截断的锚点（前缀匹配）
+                                const target = headingEls.find(h => slugify(h.textContent) === slug)
+                                  || headingEls.find(h => slugify(h.textContent).startsWith(slug) || slug.startsWith(slugify(h.textContent)));
+                                scrollPreviewToElement(target);
+                              }}
+                            >
+                              {children}
+                            </a>
+                          );
+                        }
+                        return <a {...props} href={href}>{children}</a>;
+                      },
                       table({node, children, ...props}) {
                         return (
                           <div className="table-wrapper" style={{ overflowX: 'auto', margin: '24px 0', border: '1px solid #e2e8f0', borderRadius: 8 }}>

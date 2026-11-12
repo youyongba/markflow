@@ -17,6 +17,8 @@ const initialState = {
   activeTab: 'source', // 'source', 'split', 'preview'
   isSyncScroll: true,
   treeNodes: [], // 扁平化目录树数据
+  documentSource: '', // 当前文档的 Markdown 源码（由编辑器同步，供右侧大纲解析）
+  headingNavigation: null, // 标题跳转事件 { line, index, nonce }
   bookmarks: [], // 书签数据
   filesCount: 0,
   tagsCount: 0,
@@ -69,6 +71,12 @@ export const layoutSlice = createSlice({
     setBookmarks: (state, action) => {
       state.bookmarks = action.payload;
     },
+    setDocumentSource: (state, action) => {
+      state.documentSource = action.payload;
+    },
+    navigateToHeading: (state, action) => {
+      state.headingNavigation = action.payload;
+    },
     updateDocumentTitle: (state, action) => {
       state.activeDocument.title = action.payload;
     },
@@ -102,6 +110,8 @@ export const {
   setTreeNodes,
   addTreeNodes,
   setBookmarks,
+  setDocumentSource,
+  navigateToHeading,
   updateDocumentTitle,
   updateDocumentStatus,
   setActiveDocument,

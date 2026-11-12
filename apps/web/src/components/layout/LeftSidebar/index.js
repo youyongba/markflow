@@ -96,10 +96,16 @@ export const LeftSidebar = () => {
       if (res.code === 200 && res.data) {
         dispatch(addTreeNodes([res.data]));
         
-        // 如果是在某个父节点下新建的，确保该父节点处于展开状态
-        if (parentId && !expandedNodes.includes(parentId)) {
-          dispatch(toggleNodeExpansion(parentId));
-          api.updatePreferences({ expandedNodes: [...expandedNodes, parentId] }).catch(err => console.error('Failed to update preferences', err));
+        // 如果是在某个父节点下新建的，确保该父节点处于展开状态，并同步其全部子节点
+        if (parentId) {
+          const childRes = await api.fetchTreeNodes(parentId);
+          if (childRes.code === 200 && childRes.data) {
+            dispatch(addTreeNodes(childRes.data));
+          }
+          if (!expandedNodes.includes(parentId)) {
+            dispatch(toggleNodeExpansion(parentId));
+            api.updatePreferences({ expandedNodes: [...expandedNodes, parentId] }).catch(err => console.error('Failed to update preferences', err));
+          }
         }
       } else {
         alert(res.message || '创建目录失败');
@@ -180,8 +186,8 @@ export const LeftSidebar = () => {
     try {
       const res = await api.renameDocument(docId, newTitle.trim());
       if (res.code === 200) {
-        // 重新拉取整棵树来刷新数据
-        const treeRes = await api.fetchTreeNodes();
+        // 重新拉取整棵树（含所有层级）来刷新数据，避免清空已展开目录的子节点
+        const treeRes = await api.fetchFullTree();
         if (treeRes.code === 200 && treeRes.data) {
           dispatch(setTreeNodes(treeRes.data));
         }

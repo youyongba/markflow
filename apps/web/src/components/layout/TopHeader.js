@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Folder, Search, Share, Plus, ChevronDown, AlignLeft, X, FileText, CheckCircle, Sparkles, Settings, Keyboard, ArrowRightLeft, LogOut } from 'lucide-react';
 import styles from '../../pages/index.module.css';
-import { toggleLeftSidebar, setTreeNodes, toggleNodeExpansion, setPreferences, setActiveDocument } from '../../store/slices/layoutSlice';
+import { toggleLeftSidebar, toggleRightSidebar, setTreeNodes, toggleNodeExpansion, setPreferences, setActiveDocument } from '../../store/slices/layoutSlice';
 import * as api from '../../services/api/header';
 import * as sidebarApi from '../../services/api/sidebar';
 
 export const TopHeader = () => {
   const dispatch = useDispatch();
-  const { isLeftSidebarOpen, expandedNodes, activeDocument } = useSelector((state) => state.layout);
+  const { isLeftSidebarOpen, isRightSidebarOpen, expandedNodes, activeDocument } = useSelector((state) => state.layout);
   const currentDocId = activeDocument?.id;
 
   const [headerContext, setHeaderContext] = useState(null);
@@ -49,24 +49,36 @@ export const TopHeader = () => {
     }).catch(err => console.error('Failed to fetch header context', err));
   }, [currentDocId, activeDocument?.title]);
 
-  // 初始化拉取用户信息和目录树
+  // 递归拉取所有层级的文件夹，供新建文档选择（每次打开弹窗时调用，保证与目录树同步）
+  const loadTreeFolders = useCallback(async () => {
+    try {
+      const folders = [];
+      const walk = async (parentId, prefix) => {
+        const res = await sidebarApi.fetchTreeNodes(parentId);
+        if (res.code !== 200 || !Array.isArray(res.data)) return;
+        for (const node of res.data) {
+          if (node.type !== 'folder') continue;
+          const path = prefix ? `${prefix} / ${node.title}` : node.title;
+          folders.push({ id: node.id, title: node.title, path });
+          if (node.hasChildren) {
+            await walk(node.id, path);
+          }
+        }
+      };
+      await walk(undefined, '');
+      setTreeFolders(folders);
+      // 保留仍然有效的选择，否则回退到根目录
+      setDocDirectory(prev => (prev && prev !== 'root' && folders.some(f => f.id === prev)) ? prev : 'root');
+    } catch (err) {
+      console.error('Failed to fetch tree nodes for dropdown', err);
+    }
+  }, []);
+
+  // 初始化拉取用户信息
   useEffect(() => {
     api.fetchUserProfile().then(res => {
       if (res.code === 200) setUserProfile(res.data);
     }).catch(err => console.error('Failed to fetch user profile', err));
-
-    // 拉取所有文件夹节点供新建文档选择
-    sidebarApi.fetchTreeNodes().then(res => {
-      if (res.code === 200) {
-        // 过滤出所有 type 为 folder 的节点
-        const folders = res.data.filter(node => node.type === 'folder');
-        setTreeFolders(folders);
-        // 如果有文件夹，默认选中第一个
-        if (folders.length > 0) {
-           setDocDirectory(folders[0].id);
-        }
-      }
-    }).catch(err => console.error('Failed to fetch tree nodes for dropdown', err));
   }, []);
 
   // 生成分享链接交互
@@ -88,8 +100,11 @@ export const TopHeader = () => {
     }
   };
 
-  // 打开新建文档弹窗
-  const handleCreateDoc = () => setIsCreateModalOpen(true);
+  // 打开新建文档弹窗，并实时刷新可选目录
+  const handleCreateDoc = () => {
+    setIsCreateModalOpen(true);
+    loadTreeFolders();
+  };
 
 
   // 确认创建文档
@@ -102,7 +117,7 @@ export const TopHeader = () => {
         // 调用专用的新建 REST API 模板接口 (不再依赖 enableAi)
         const payload = {
           title: docTitle || '无标题文档',
-          parentId: docDirectory,
+          parentId: docDirectory === 'root' ? null : docDirectory,
           apiDescription: "生成API文档",
           apiType: 'rest'
         };
@@ -143,12 +158,23 @@ export const TopHeader = () => {
           creatorName: userProfile?.userName
         }));
 
-        if (docDirectory && docDirectory !== 'root' && !expandedNodes.includes(docDirectory)) {
-          dispatch(toggleNodeExpansion(docDirectory)); // 确保该目录处于展开状态
-        }
-        const treeRes = await sidebarApi.fetchTreeNodes();
+        // 整树刷新（含所有层级），避免清空已展开目录的子节点
+        const treeRes = await sidebarApi.fetchFullTree();
         if (treeRes.code === 200) {
           dispatch(setTreeNodes(treeRes.data));
+
+          // 展开目标目录及其所有祖先目录，确保新文档可见
+          if (docDirectory && docDirectory !== 'root') {
+            const expandedIds = new Set(expandedNodes.map(String));
+            const nodeMap = new Map(treeRes.data.map(n => [String(n.id), n]));
+            let current = nodeMap.get(String(docDirectory));
+            while (current) {
+              if (!expandedIds.has(String(current.id))) {
+                dispatch(toggleNodeExpansion(current.id));
+              }
+              current = current.parentId ? nodeMap.get(String(current.parentId)) : null;
+            }
+          }
         }
       }
     } catch (err) {
@@ -424,6 +450,16 @@ export const TopHeader = () => {
             </div>
           )}
         </div>
+        {/* 右侧导航目录隐藏时，显示展开入口（与左侧边栏的交互一致） */}
+        {!isRightSidebarOpen && (
+          <AlignLeft
+            size={18}
+            color="#64748b"
+            style={{ cursor: 'pointer', marginLeft: 12 }}
+            title="显示导航目录"
+            onClick={() => dispatch(toggleRightSidebar())}
+          />
+        )}
       </div>
 
       {/* 新建文档弹窗 (浮层) */}
@@ -464,10 +500,10 @@ export const TopHeader = () => {
                   <div style={{ display:'flex', alignItems:'center', position:'relative', border:'1px solid #e2e8f0', borderRadius:6, backgroundColor:'#f8fafc' }}>
                     <Folder size={14} color="#64748b" style={{ position:'absolute', left:12 }} />
                     <select value={docDirectory} onChange={e => setDocDirectory(e.target.value)} style={{ width:'100%', appearance:'none', border:'none', backgroundColor:'transparent', padding:'8px 32px', fontSize:13, color:'#334155', outline:'none', cursor:'pointer' }}>
-                      {treeFolders.map(folder => (
-                        <option key={folder.id} value={folder.id}>{folder.title}</option>
-                      ))}
                       <option value="root">根目录 (Root)</option>
+                      {treeFolders.map(folder => (
+                        <option key={folder.id} value={folder.id}>{folder.path}</option>
+                      ))}
                     </select>
                     <ChevronDown size={14} color="#94a3b8" style={{ position:'absolute', right:12, pointerEvents:'none' }} />
                   </div>
@@ -517,8 +553,8 @@ export const TopHeader = () => {
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 20px', backgroundColor:'#f8fafc', borderTop:'1px solid #e2e8f0' }}>
               <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'#64748b' }}>
                 <Folder size={14} color="#eab308" style={{ flexShrink: 0 }} />
-                <span style={{ maxWidth: 320, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`/${treeFolders.find(f => f.id === docDirectory)?.title || '根目录 (Root)'}/${docTitle || '无标题文档'}`}>
-                  保存至: /{treeFolders.find(f => f.id === docDirectory)?.title || '根目录 (Root)'}/{docTitle || '无标题文档'}
+                <span style={{ maxWidth: 320, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`/${treeFolders.find(f => f.id === docDirectory)?.path || '根目录 (Root)'}/${docTitle || '无标题文档'}`}>
+                  保存至: /{treeFolders.find(f => f.id === docDirectory)?.path || '根目录 (Root)'}/{docTitle || '无标题文档'}
                 </span>
               </div>
               <div style={{ display:'flex', gap:12, alignItems:'center' }}>
