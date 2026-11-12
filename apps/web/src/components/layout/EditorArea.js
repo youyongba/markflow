@@ -397,24 +397,49 @@ document.addEventListener('click', function (e) {
   var code = block && block.querySelector('pre code');
   if (!code) return;
   var text = code.innerText;
-  function done() {
+  function setLabel(msg) {
     var label = btn.querySelector('span:last-child') || btn;
     var old = label.textContent;
-    label.textContent = '已复制';
+    label.textContent = msg;
     setTimeout(function () { label.textContent = old; }, 1500);
   }
-  function fallback() {
+  function selectCode() {
+    var range = document.createRange();
+    range.selectNodeContents(code);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  function legacyCopy() {
     var ta = document.createElement('textarea');
     ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.top = '-9999px';
+    ta.style.opacity = '0';
     document.body.appendChild(ta);
+    ta.focus();
     ta.select();
-    try { document.execCommand('copy'); done(); } catch (err) {}
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (err) {}
     document.body.removeChild(ta);
+    if (ok) {
+      setLabel('已复制');
+    } else {
+      // 剪贴板不可用时选中代码，保证用户总能手动复制
+      selectCode();
+      setLabel('已选中，请按 Ctrl/Cmd+C 复制');
+    }
   }
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(done).catch(fallback);
+    try {
+      navigator.clipboard.writeText(text).then(function () {
+        setLabel('已复制');
+      }).catch(legacyCopy);
+    } catch (err) {
+      legacyCopy();
+    }
   } else {
-    fallback();
+    legacyCopy();
   }
 });
 <\/script>`;
@@ -1031,7 +1056,7 @@ ${exportScript}
                         };
 
                         return !inline && match ? (
-                          <div className={styles.customCodeBlock} style={{ borderRadius: 4, overflow: 'hidden', border: '1px solid #dce9ff', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', marginBottom: 24 }}>
+                          <div className="customCodeBlock" style={{ borderRadius: 4, overflow: 'hidden', border: '1px solid #dce9ff', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', marginBottom: 24 }}>
                             <div className={styles.codeHeader} style={{ backgroundColor: '#213145', color: '#eaf1ff', padding: '6px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12.5, fontFamily: 'ui-monospace, monospace' }}>
                               <div className={styles.macDots} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span className={styles.macDot} style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#ba1a1a', display: 'inline-block' }}></span>
