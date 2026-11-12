@@ -357,43 +357,43 @@ export const EditorArea = () => {
         a.click();
         URL.revokeObjectURL(url);
       } else if (format === 'html' || format === 'pdf') {
-        // 2 & 3. 导出 HTML 和 PDF (抓取右侧渲染好的 DOM 节点并注入离线样式)
-        const previewNode = document.querySelector('.markdown-body');
+        // 2 & 3. 导出 HTML 和 PDF：完整复制预览 DOM 和当前页面的全部样式，保证与“只读渲染”一致
+        const previewNode = document.querySelector(`.${styles.previewContent}`) || document.querySelector('.markdown-body');
         if (!previewNode) {
           alert('请先切换到包含“实时排版预览”的分屏模式，以获取渲染内容');
           setIsExporting(false);
           return;
         }
-        
-        const htmlContent = previewNode.innerHTML;
+
+        // 收集页面所有样式表（含 CSS Modules、Prism 等），预览 DOM 的类名不变，样式即可原样还原
+        const cssText = Array.from(document.styleSheets).map(sheet => {
+          try {
+            return Array.from(sheet.cssRules).map(rule => rule.cssText).join('\n');
+          } catch (err) {
+            return '';
+          }
+        }).join('\n');
+
         const fullHtml = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
+<style>${cssText}</style>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; color: #1f2937; line-height: 1.6; }
-  h1 { font-size: 32px; margin-bottom: 24px; color: #0b1c30; }
-  h2 { display: flex; align-items: center; gap: 8px; font-size: 20px; margin-top: 32px; margin-bottom: 16px; color: #0b1c30; }
-  table { width: 100%; border-collapse: collapse; margin: 24px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
-  th, td { padding: 14px 16px; text-align: left; }
-  th { background-color: #f8fafc; font-weight: 600; text-transform: uppercase; font-size: 14px; color: #1e293b; border-bottom: 1px solid #e2e8f0; }
-  td { border-bottom: 1px solid #e2e8f0; font-size: 14px; }
-  tr:last-child td { border-bottom: none; }
-  blockquote { position: relative; border-left: 4px solid #b45309; margin: 24px 0; padding: 16px 20px; background-color: #fdf6ef; border-radius: 0 8px 8px 0; }
-  pre { background-color: #ffffff; padding: 16px; overflow-x: auto; border-radius: 4px; border: 1px solid #dce9ff; font-family: ui-monospace, monospace; font-size: 13.5px; }
-  .table-wrapper { overflow-x: auto; }
-  @media print {
-    body { padding: 0; max-width: 100%; }
-    .table-wrapper { overflow: visible; }
-  }
+  /* 打印时保留背景色与边框颜色，避免 PDF 丢失预览配色 */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  /* 覆盖应用全局的 html,body{height:100vh;overflow:hidden}，否则打印时会被裁剪成一页 */
+  html, body { height: auto !important; overflow: visible !important; }
+  /* 与应用内 .layout 的字体保持一致，避免导出后字体回退不同 */
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+  @page { margin: 12mm; }
 </style>
 </head>
 <body>
-  <h1>${title}</h1>
-  <div class="markdown-body">
-    ${htmlContent}
-  </div>
+${previewNode.outerHTML}
 </body>
 </html>`;
 
