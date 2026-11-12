@@ -356,6 +356,20 @@ export const EditorArea = () => {
         a.download = `${title}.md`;
         a.click();
         URL.revokeObjectURL(url);
+      } else if (format === 'word') {
+        // 导出 Word：将 Markdown 转为带预览样式的 .docx
+        const [{ createDocx }, { Packer }] = await Promise.all([
+          import('../../utils/exportWord'),
+          import('docx')
+        ]);
+        const doc = createDocx(sourceCode);
+        const blob = await Packer.toBlob(doc);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${title}.docx`;
+        a.click();
+        URL.revokeObjectURL(url);
       } else if (format === 'html' || format === 'pdf') {
         // 2 & 3. 导出 HTML 和 PDF：完整复制预览 DOM 和当前页面的全部样式，保证与“只读渲染”一致
         const previewNode = document.querySelector(`.${styles.previewContent}`) || document.querySelector('.markdown-body');
@@ -731,6 +745,15 @@ ${exportScript}
                   >
                     <FileCode2 size={16} color="#7c3aed" />
                     导出 HTML 包
+                  </div>
+                  <div 
+                    style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', fontSize: 14, color: '#334155' }}
+                    onClick={() => handleExport('word')}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <FileText size={16} color="#2b579a" />
+                    导出 Word
                   </div>
                 </div>
               </>
