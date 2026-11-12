@@ -374,6 +374,51 @@ export const EditorArea = () => {
           }
         }).join('\n');
 
+        // 克隆预览 DOM，为标题补充锚点 id，并把正文内的锚点链接改写为真实 id（PDF/HTML 内点击即可跳转）
+        const clone = previewNode.cloneNode(true);
+        const headingEls = Array.from(clone.querySelectorAll('.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6'));
+        headingEls.forEach((h, i) => { h.id = `heading-${i}`; });
+        clone.querySelectorAll('.markdown-body a[href^="#"]').forEach(a => {
+          let anchor = a.getAttribute('href').slice(1);
+          try { anchor = decodeURIComponent(anchor); } catch (err) {}
+          const slug = slugify(anchor);
+          if (!slug) return;
+          const target = headingEls.find(h => slugify(h.textContent) === slug)
+            || headingEls.find(h => slugify(h.textContent).startsWith(slug) || slug.startsWith(slugify(h.textContent)));
+          if (target) a.setAttribute('href', '#' + target.id);
+        });
+
+        // 导出的独立文件不依赖 React：注入原生 JS 实现“复制代码”按钮（PDF 为静态格式，按钮仅作展示）
+        const exportScript = `<script>
+document.addEventListener('click', function (e) {
+  var btn = e.target.closest('[class*="customCodeBlock"] button');
+  if (!btn) return;
+  var block = btn.closest('[class*="customCodeBlock"]');
+  var code = block && block.querySelector('pre code');
+  if (!code) return;
+  var text = code.innerText;
+  function done() {
+    var label = btn.querySelector('span:last-child') || btn;
+    var old = label.textContent;
+    label.textContent = '已复制';
+    setTimeout(function () { label.textContent = old; }, 1500);
+  }
+  function fallback() {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (err) {}
+    document.body.removeChild(ta);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(fallback);
+  } else {
+    fallback();
+  }
+});
+<\/script>`;
+
         const fullHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -393,7 +438,8 @@ export const EditorArea = () => {
 </style>
 </head>
 <body>
-${previewNode.outerHTML}
+${clone.outerHTML}
+${exportScript}
 </body>
 </html>`;
 
