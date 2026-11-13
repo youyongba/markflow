@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Local environment files (keep the example template)
+.env
+.env.*
+!.env.example
+
+# Local databases: prevent development data from overwriting server data
+/apps/server/db/backups/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Runtime files and logs
+logs/
+*.log
+*.pid
+*.seed
+tmp/
+temp/
+
+# Test and coverage output
+coverage/
+.nyc_output/
+
+# Caches
+.cache/
+.eslintcache
+.stylelintcache
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
