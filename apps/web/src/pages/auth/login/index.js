@@ -102,6 +102,7 @@ export default function Login() {
           <span className={styles.versionBadge} style={{ marginLeft: '8px' }}>V2.4-CORE</span>
         </div>
         <div className={styles.navRight}>
+          <a href="/manual" className={styles.manualLink}>使用手册</a>
           <Terminal size={16} />
           <span>CLI Documentation</span>
         </div>

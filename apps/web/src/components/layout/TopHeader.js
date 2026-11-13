@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Folder, Search, Share, Plus, ChevronDown, AlignLeft, X, FileText, CheckCircle, Sparkles, Settings, Keyboard, ArrowRightLeft, LogOut } from 'lucide-react';
+import { Folder, Search, Share, Plus, ChevronDown, AlignLeft, X, FileText, CheckCircle, Sparkles, Settings, Keyboard, ArrowRightLeft, LogOut, BookOpen } from 'lucide-react';
 import styles from '../../pages/index.module.css';
 import { toggleLeftSidebar, toggleRightSidebar, setTreeNodes, toggleNodeExpansion, setPreferences, setActiveDocument } from '../../store/slices/layoutSlice';
 import * as api from '../../services/api/header';
@@ -431,6 +431,22 @@ export const TopHeader = () => {
             
 
               <div style={{ height: '1px', backgroundColor: '#e2e8f0' }} />
+
+              {/* 使用手册 */}
+              <div style={{ padding: '8px 0' }}>
+                <a
+                  href="/manual"
+                  style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'background 0.2s', textDecoration: 'none' }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#334155', fontSize: '14px', fontWeight: '500' }}>
+                    <BookOpen size={18} />
+                    <span>使用手册</span>
+                  </div>
+                  <div style={{ color: '#94a3b8', fontSize: '13px' }}>User Guide</div>
+                </a>
+              </div>
 
               {/* 退出登录 */}
               <div style={{ padding: '8px 0' }}>

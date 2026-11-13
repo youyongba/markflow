@@ -1,10 +1,22 @@
 import {
   Document, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell,
-  WidthType, ShadingType, BorderStyle
+  WidthType, ShadingType, BorderStyle, Bookmark, InternalHyperlink
 } from 'docx';
 import { fromMarkdown } from 'mdast-util-from-markdown';
 import { gfmFromMarkdown } from 'mdast-util-gfm';
 import { gfm } from 'micromark-extension-gfm';
+
+// 与预览一致的锚点 slug 规则（保留中英文、数字、_ 和 -，去标点，空格转 -）
+const slugify = (text) => String(text || '')
+  .trim()
+  .toLowerCase()
+  .replace(/[^\p{L}\p{N}\s_-]/gu, '')
+  .replace(/\s+/g, '-');
+
+// 当前文档的标题书签表 [{ id, slug }]，供正文锚点链接匹配
+let headingBookmarks = [];
+let headingIndex = 0;
+const plainText = (nodes) => (nodes || []).map(n => n.value || (n.children ? plainText(n.children) : '')).join('');
 
 // 与只读渲染一致的颜色与字号（docx 字号为半点，px * 0.75 * 2 = px * 1.5）
 const COLOR_TEXT = '0B1C30';
@@ -59,9 +71,25 @@ function inlineRuns(nodes, inherited = {}) {
           shading: clearShading('F1F5F9')
         }));
         break;
-      case 'link':
+      case 'link': {
+        // 正文内的锚点链接（目录索引等）：转为 Word 内部超链接，点击跳转到对应标题书签
+        if (node.url && node.url.startsWith('#')) {
+          let anchor = node.url.slice(1);
+          try { anchor = decodeURIComponent(anchor); } catch (err) {}
+          const slug = slugify(anchor);
+          const target = headingBookmarks.find(b => b.slug === slug)
+            || headingBookmarks.find(b => b.slug.startsWith(slug) || slug.startsWith(b.slug));
+          if (target) {
+            runs.push(new InternalHyperlink({
+              children: inlineRuns(node.children, { ...inherited, color: COLOR_LINK }),
+              anchor: target.id
+            }));
+            break;
+          }
+        }
         runs.push(...inlineRuns(node.children, { ...inherited, color: COLOR_LINK }));
         break;
+      }
       case 'break':
         runs.push(new TextRun({ break: 1 }));
         break;
@@ -77,11 +105,14 @@ function inlineRuns(nodes, inherited = {}) {
   return runs;
 }
 
-function headingParagraph(node) {
+function headingParagraph(node, bookmarkId) {
   const level = node.depth;
   const size = level === 1 ? SIZE_H1 : level === 2 ? SIZE_H2 : SIZE_H3;
   return new Paragraph({
-    children: inlineRuns(node.children, { size, bold: level <= 2 }),
+    children: [new Bookmark({
+      id: bookmarkId,
+      children: inlineRuns(node.children, { size, bold: level <= 2 })
+    })],
     spacing: { before: level === 1 ? 0 : 240, after: 160 },
     // 预览中 h2 带蓝色竖条，用左边框近似还原
     border: level === 2 ? { left: { style: BorderStyle.SINGLE, size: 24, color: '30568B', space: 8 } } : undefined
@@ -94,7 +125,12 @@ function codeBlock(node) {
   return [
     // 深色头部（语言名），与预览的 codeHeader 对应
     new Paragraph({
-      children: [new TextRun({ text: lang, font: FONT_MONO, size: SIZE_CODE, color: 'C3C6D1' })],
+      children: [
+      new TextRun({ text: '● ', font: FONT_MONO, size: SIZE_CODE, color: 'BA1A1A' }),
+      new TextRun({ text: '● ', font: FONT_MONO, size: SIZE_CODE, color: 'FFB95F' }),
+      new TextRun({ text: '● ', font: FONT_MONO, size: SIZE_CODE, color: 'A7C8FF' }),
+      new TextRun({ text: lang, font: FONT_MONO, size: SIZE_CODE, color: 'C3C6D1' })
+    ],
       shading: clearShading('213145'),
       spacing: { before: 120, after: 0 },
       indent: { left: 160 }
@@ -167,7 +203,7 @@ function blockElements(nodes, inBlockquote = false) {
     } : {};
     switch (node.type) {
       case 'heading':
-        blocks.push(headingParagraph(node));
+        blocks.push(headingParagraph(node, `heading-${headingIndex++}`));
         break;
       case 'paragraph':
         blocks.push(new Paragraph({
@@ -179,9 +215,21 @@ function blockElements(nodes, inBlockquote = false) {
       case 'code':
         blocks.push(...codeBlock(node));
         break;
-      case 'blockquote':
-        blocks.push(...blockElements(node.children, true));
+      case 'blockquote': {
+        const children = [...(node.children || [])];
+        // 与预览一致：多段引用的第一段作为标题，加粗橙色显示
+        if (children.length > 1 && children[0].type === 'paragraph') {
+          const title = plainText(children[0].children).split('\n')[0].replace(/^\[!(WARNING|INFO|NOTE|TIP)\]\s*/i, '');
+          children.shift();
+          blocks.push(new Paragraph({
+            children: [new TextRun({ text: title, font: FONT_TEXT, size: 22, bold: true, color: 'B45309' })],
+            spacing: { after: 80 },
+            ...quoteStyle
+          }));
+        }
+        blocks.push(...blockElements(children, true));
         break;
+      }
       case 'list':
         blocks.push(...listItems(node, node.ordered));
         break;
@@ -219,6 +267,18 @@ export function createDocx(markdown) {
     extensions: [gfm()],
     mdastExtensions: [gfmFromMarkdown()]
   });
+  // 先按文档顺序登记全部标题书签，供标题渲染与正文锚点链接使用
+  headingIndex = 0;
+  headingBookmarks = [];
+  const collect = (nodes) => {
+    for (const n of nodes || []) {
+      if (n.type === 'heading') {
+        headingBookmarks.push({ id: `heading-${headingBookmarks.length}`, slug: slugify(plainText(n.children)) });
+      }
+      if (n.children) collect(n.children);
+    }
+  };
+  collect(tree.children);
   return new Document({
     creator: 'MarkFlow',
     styles: {

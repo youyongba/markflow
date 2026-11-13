@@ -50,6 +50,16 @@
   cursor: pointer;
 }
 
+.manualLink {
+  color: #2563eb;
+  text-decoration: none;
+  margin-right: 8px;
+}
+
+.manualLink:hover {
+  text-decoration: underline;
+}
+
 .main {
   flex: 1;
   display: flex;
