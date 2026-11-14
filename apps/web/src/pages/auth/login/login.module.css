@@ -431,6 +431,36 @@
   cursor: not-allowed;
 }
 
+.wechatGroup {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.wechatQr {
+  width: 96px;
+  height: auto;
+  flex-shrink: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.wechatInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.wechatInfo strong {
+  font-size: 15px;
+  color: #0f172a;
+}
+
 .webauthnBox {
   background-color: #f8fafc;
   border-radius: 8px;
@@ -519,13 +549,3 @@
   color: #64748b;
 }
 
-.footerRight {
-  display: flex;
-  gap: 16px;
-}
-.footerRight span {
-  cursor: pointer;
-}
-.footerRight span:hover {
-  color: #0f172a;
-}

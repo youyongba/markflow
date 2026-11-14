@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { 
   Mail, 
@@ -206,6 +207,21 @@ export default function Login() {
                   {!loading && <ArrowRight size={18} />}
                 </button>
               </form>
+
+              <div className={styles.wechatGroup}>
+                <Image
+                  src="/images/群二维码.jpg"
+                  alt="MarkFlow 微信群二维码"
+                  width={96}
+                  height={144}
+                  className={styles.wechatQr}
+                />
+                <div className={styles.wechatInfo}>
+                  <strong>微信交流群</strong>
+                  <span>微信扫码进群，交流使用经验</span>
+                  <span>私有部署请联系作者：小洪</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -214,12 +230,7 @@ export default function Login() {
 
       {/* Footer */}
       <footer className={styles.footer}>
-        <div>© 2025 MarkFlow Systems Inc. • Documentation-as-Code Engine</div>
-        <div className={styles.footerRight}>
-          <span>Security Protocol</span>
-          <span>Architecture Status</span>
-          <span>Zero-Telemetry Spec</span>
-        </div>
+        <div>© 2026-2028 个人开源项目 • 当前为演示版本 • 如需私有部署，请联系作者：小洪</div>
       </footer>
     </div>
   );
