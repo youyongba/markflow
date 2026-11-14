@@ -15,8 +15,8 @@ async function initApp() {
   
   app.use(express.json());
   
-  // 挂载 API 路由 (前缀 /api)
-  app.use('/api', apiRoutes);
+  // 挂载 API 路由 (前缀 /v2.4)
+  app.use('/v2.4', apiRoutes);
   
   // 剩下的所有请求交给 Next.js 处理 (包括页面渲染和静态资源)
   app.all('*', (req, res) => {
