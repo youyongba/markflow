@@ -3,7 +3,7 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 const { initApp } = require('./app');
 const { startDatabaseBackupSchedule } = require('./services/database-backup.service');
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3106;
 
 async function bootstrap() {
   try {
