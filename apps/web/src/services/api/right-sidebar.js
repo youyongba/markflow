@@ -37,3 +37,16 @@ export const fetchCommits = async (documentId, limit = 5) => {
   const res = await fetch(url);
   return res.json();
 };
+
+// 5. 获取文档跟进记录（日期筛选 + 分页）
+export const fetchActivities = async (documentId, { date = '', page = 1, pageSize = 10 } = {}, { signal } = {}) => {
+  const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (date) query.append('date', date);
+
+  const res = await fetch(`${getBaseUrl()}/${documentId}/activities?${query.toString()}`, { signal });
+  const result = await res.json();
+  if (!res.ok || result.code !== 200) {
+    throw new Error(result.message || '跟进记录加载失败');
+  }
+  return result;
+};

@@ -8,7 +8,7 @@ import styles from '../../../pages/index.module.css';
 import { 
   setActiveNavItem, toggleNodeExpansion, toggleLeftSidebar, 
   setPreferences, setTreeNodes, addTreeNodes, setBookmarks,
-  setActiveDocument
+  setActiveDocument, notifyDocumentActivity
 } from '../../../store/slices/layoutSlice';
 import * as api from '../../../services/api/sidebar';
 
@@ -186,6 +186,7 @@ export const LeftSidebar = () => {
     try {
       const res = await api.renameDocument(docId, newTitle.trim());
       if (res.code === 200) {
+        dispatch(notifyDocumentActivity({ documentId: docId, nonce: Date.now() }));
         // 重新拉取整棵树（含所有层级）来刷新数据，避免清空已展开目录的子节点
         const treeRes = await api.fetchFullTree();
         if (treeRes.code === 200 && treeRes.data) {

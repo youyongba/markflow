@@ -18,7 +18,7 @@ import { Toolbar } from 'markmap-toolbar';
 import 'markmap-toolbar/dist/style.css';
 import styles from '../../pages/index.module.css';
 import { useSelector, useDispatch } from 'react-redux';
-import { setActiveTab, toggleSyncScroll, toggleRightSidebar, setDocumentSource } from '../../store/slices/layoutSlice';
+import { setActiveTab, toggleSyncScroll, toggleRightSidebar, setDocumentSource, notifyDocumentActivity } from '../../store/slices/layoutSlice';
 import * as api from '../../services/api/editor';
 
 const Copy = ({ size, ...props }) => (
@@ -224,13 +224,14 @@ export const EditorArea = () => {
       api.saveContent(currentDocId, newCode).then(res => {
         if (res.code === 200) {
           setLastSavedAt(new Date().toLocaleTimeString('en-US', { hour12: false }));
+          dispatch(notifyDocumentActivity({ documentId: currentDocId, nonce: Date.now() }));
         }
       }).catch(err => {
         console.error('Save failed', err);
         setLastSavedAt('保存失败');
       });
     }, 1000);
-  }, [currentDocId]);
+  }, [currentDocId, dispatch]);
 
   // 格式化工具栏的交互处理
   const handleFormat = (type) => {

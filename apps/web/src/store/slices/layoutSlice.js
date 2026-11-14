@@ -19,6 +19,7 @@ const initialState = {
   treeNodes: [], // 扁平化目录树数据
   documentSource: '', // 当前文档的 Markdown 源码（由编辑器同步，供右侧大纲解析）
   headingNavigation: null, // 标题跳转事件 { line, index, nonce }
+  activityRefresh: null, // 跟进记录刷新事件 { documentId, nonce }
   bookmarks: [], // 书签数据
   filesCount: 0,
   tagsCount: 0,
@@ -77,6 +78,9 @@ export const layoutSlice = createSlice({
     navigateToHeading: (state, action) => {
       state.headingNavigation = action.payload;
     },
+    notifyDocumentActivity: (state, action) => {
+      state.activityRefresh = action.payload;
+    },
     updateDocumentTitle: (state, action) => {
       state.activeDocument.title = action.payload;
     },
@@ -112,6 +116,7 @@ export const {
   setBookmarks,
   setDocumentSource,
   navigateToHeading,
+  notifyDocumentActivity,
   updateDocumentTitle,
   updateDocumentStatus,
   setActiveDocument,

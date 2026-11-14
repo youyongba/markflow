@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { getDb } = require('../config/database');
+const { getDb, withTransaction } = require('../config/database');
 const authMiddleware = require('../middleware/auth.middleware');
 
 const router = Router();
@@ -241,7 +241,11 @@ router.put('/tree-nodes/document/:id', authMiddleware, async (req, res) => {
     const userId = req.user.userId;
     const docId = req.params.id;
 
-    const node = await db.get('SELECT creator_id FROM tree_nodes WHERE id = ? AND node_type = "document"', [docId]);
+    if (!/^[1-9]\d*$/.test(docId) || typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({ code: 400, message: '文档 ID 或标题无效' });
+    }
+
+    const node = await db.get('SELECT creator_id, title FROM tree_nodes WHERE id = ? AND node_type = "document"', [docId]);
     if (!node) {
       return res.status(404).json({ code: 404, message: '文档不存在' });
     }
@@ -250,9 +254,23 @@ router.put('/tree-nodes/document/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ code: 403, message: '无权限重命名此文档' });
     }
 
-    await db.run('UPDATE tree_nodes SET title = ? WHERE id = ?', [title, docId]);
+    const nextTitle = title.trim();
+    if (node.title === nextTitle) {
+      return res.json({ code: 200, message: '标题未发生变化' });
+    }
+
+    const createdAt = new Date().toISOString();
+    await withTransaction(async (transactionDb) => {
+      await transactionDb.run('UPDATE tree_nodes SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [nextTitle, docId]);
+      await transactionDb.run(
+        'INSERT INTO document_activities (document_id, actor_id, action_type, details_json, created_at) VALUES (?, ?, ?, ?, ?)',
+        [docId, userId, 'title_updated', JSON.stringify({ from: node.title, to: nextTitle }), createdAt]
+      );
+    });
+
     res.json({ code: 200, message: '修改成功' });
   } catch (err) {
+    console.error('Rename document error:', err);
     res.status(500).json({ code: 500, message: 'Server error' });
   }
 });

@@ -204,6 +204,23 @@ CREATE TABLE IF NOT EXISTS user_bookmarks (
 CREATE INDEX IF NOT EXISTS idx_user_bookmarks_userid ON user_bookmarks(user_id);
 
 -- ==============================================================================
+-- 14. 文档跟进记录表 (document_activities)
+-- ==============================================================================
+-- 记录正文保存、文档重命名等真实操作，不保存正文快照
+CREATE TABLE IF NOT EXISTS document_activities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL,
+    actor_id INTEGER NOT NULL,
+    action_type VARCHAR(50) NOT NULL,
+    details_json TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (document_id) REFERENCES tree_nodes(id) ON DELETE CASCADE,
+    FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_document_activities_document_created
+    ON document_activities(document_id, created_at DESC, id DESC);
+
+-- ==============================================================================
 -- 初始化测试数据 (工作区与目录树)
 -- ==============================================================================
 INSERT OR IGNORE INTO users (email, password_hash, name, role, avatar_url)
