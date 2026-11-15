@@ -5,6 +5,7 @@ import styles from '../../pages/index.module.css';
 import { toggleLeftSidebar, toggleRightSidebar, setTreeNodes, toggleNodeExpansion, setPreferences, setActiveDocument } from '../../store/slices/layoutSlice';
 import * as api from '../../services/api/header';
 import * as sidebarApi from '../../services/api/sidebar';
+import { trackEvent } from '../../utils/analytics';
 
 export const TopHeader = () => {
   const dispatch = useDispatch();
@@ -83,6 +84,7 @@ export const TopHeader = () => {
 
   // 生成分享链接交互
   const handleShare = async () => {
+    trackEvent('文档', '点击分享');
     if (!currentDocId) {
       setShareModal({ isOpen: true, type: 'error', message: '请先选择一个要分享的文档', link: '' });
       return;
@@ -90,11 +92,14 @@ export const TopHeader = () => {
     try {
       const res = await api.createShareLink({ targetId: currentDocId, expiresIn: 86400 });
       if (res.code === 200 && res.data) {
+        trackEvent('文档', '分享成功');
         setShareModal({ isOpen: true, type: 'success', message: '分享链接已生成：', link: res.data.shareUrl });
       } else {
+        trackEvent('文档', '分享失败');
         setShareModal({ isOpen: true, type: 'error', message: res.message || '分享失败', link: '' });
       }
     } catch (err) {
+      trackEvent('文档', '分享失败');
       console.error('Share failed', err);
       setShareModal({ isOpen: true, type: 'error', message: '网络请求失败', link: '' });
     }
@@ -102,6 +107,7 @@ export const TopHeader = () => {
 
   // 打开新建文档弹窗，并实时刷新可选目录
   const handleCreateDoc = () => {
+    trackEvent('文档', '点击新建文档');
     setIsCreateModalOpen(true);
     loadTreeFolders();
   };
@@ -150,6 +156,7 @@ export const TopHeader = () => {
       
       // 成功创建后，刷新侧边栏目录树并展开父节点
       if (documentId) {
+        trackEvent('文档', '新建成功');
         // 设置新建的文档为当前激活文档
         dispatch(setActiveDocument({
           id: parseInt(documentId) || documentId,
@@ -254,6 +261,7 @@ export const TopHeader = () => {
       const data = await res.json();
       
       if (data.code === 200) {
+        trackEvent('登录', '退出成功');
         // 1. 清除本地缓存的 token
         localStorage.removeItem('token');
         // 2. 跳转回登录页

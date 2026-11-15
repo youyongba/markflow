@@ -8,6 +8,7 @@ import {
   Link as LinkIcon,
   CheckCircle2
 } from 'lucide-react';
+import { trackEvent } from '../../../utils/analytics';
 import styles from './forgot.module.css';
 
 export default function ForgotPassword() {
@@ -19,6 +20,7 @@ export default function ForgotPassword() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    trackEvent('找回密码', '提交找回密码');
     
     try {
       const res = await fetch('/v2.4/auth/password/forgot', {
@@ -32,12 +34,15 @@ export default function ForgotPassword() {
       const data = await res.json();
 
       if (data.code === 200) {
+        trackEvent('找回密码', '发送成功');
         alert('重置链接已发送到您的邮箱，请注意查收！');
         window.location.href = '/auth/login';
       } else {
+        trackEvent('找回密码', '发送失败');
         setError(data.message || '发送失败，请稍后重试');
       }
     } catch (err) {
+      trackEvent('找回密码', '网络异常');
       console.error('Forgot password error:', err);
       setError('网络请求失败，请检查您的网络连接');
     } finally {

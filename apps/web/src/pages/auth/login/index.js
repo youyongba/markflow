@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAppDispatch } from '../../../store/hooks';
 import { setAuthUser } from '../../../store/actions/auth/login';
+import { trackEvent } from '../../../utils/analytics';
 import styles from './login.module.css';
 
 export default function Login() {
@@ -31,6 +32,7 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    trackEvent('登录', '提交登录');
 
     try {
       // 1. 获取公钥 (模拟非对称加密流程)
@@ -57,6 +59,7 @@ export default function Login() {
       const loginData = await loginRes.json();
 
       if (loginData.code === 200 && loginData.data) {
+        trackEvent('登录', '登录成功');
         // 保存 Token 到本地
         localStorage.setItem('token', loginData.data.token);
         
@@ -77,9 +80,11 @@ export default function Login() {
           window.location.href = '/';
         }
       } else {
+        trackEvent('登录', '登录失败');
         setError(loginData.message || '邮箱或访问凭据错误，请重试');
       }
     } catch (err) {
+      trackEvent('登录', '网络异常');
       console.error('Login error:', err);
       setError('网络请求失败，请检查您的网络连接');
     } finally {
@@ -103,7 +108,7 @@ export default function Login() {
           <span className={styles.versionBadge} style={{ marginLeft: '8px' }}>V2.4-CORE</span>
         </div>
         <div className={styles.navRight}>
-          <a href="/manual" className={styles.manualLink}>使用手册</a>
+          <a href="/manual" className={styles.manualLink} onClick={() => trackEvent('导航', '使用手册')}>使用手册</a>
           <Terminal size={16} />
           <span>CLI Documentation</span>
         </div>
@@ -174,7 +179,10 @@ export default function Login() {
                     <span 
                       className={styles.labelRight} 
                       style={{ color: '#3b82f6', cursor: 'pointer' }}
-                      onClick={() => window.location.href = '/auth/forgot-password'}
+                      onClick={() => {
+                        trackEvent('找回密码', '点击忘记密码');
+                        window.location.href = '/auth/forgot-password';
+                      }}
                     >
                       忘记密码？
                     </span>
