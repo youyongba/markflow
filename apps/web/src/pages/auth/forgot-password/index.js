@@ -54,6 +54,7 @@ export default function ForgotPassword() {
     <div className={styles.container}>
       <Head>
         <title>找回登录口令 - MarkFlow</title>
+        <meta name="robots" content="noindex,nofollow" />
       </Head>
 
       {/* Header */}

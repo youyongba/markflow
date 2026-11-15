@@ -33,7 +33,7 @@ export default function ShareLinkAccept() {
           setStatus('success');
           setMessage('已成功接收分享文档！即将跳转到工作区...');
           setTimeout(() => {
-            router.push('/');
+            router.push('/dashboard');
           }, 1500);
         } else {
           setStatus('error');
@@ -60,6 +60,7 @@ export default function ShareLinkAccept() {
     }}>
       <Head>
         <title>接收分享文档 - MarkFlow</title>
+        <meta name="robots" content="noindex,nofollow" />
       </Head>
       
       <div style={{

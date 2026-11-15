@@ -41,8 +41,10 @@ router.post('/login', async (req, res) => {
     const db = await getDb();
     
     let user = await db.get('SELECT * FROM users WHERE email = ?', [email]);
+    let isNewUser = false;
     
     if (!user) {
+      isNewUser = true;
       // 首次登录，自动注册
       const hashed = await bcrypt.hash(password, 10);
       const defaultName = email.split('@')[0] || 'New User';
@@ -81,6 +83,7 @@ router.post('/login', async (req, res) => {
       message: '登录成功',
       data: {
         token,
+        isNewUser,
         user: {
           id: user.id,
           name: user.name,

@@ -60,6 +60,9 @@ export default function Login() {
 
       if (loginData.code === 200 && loginData.data) {
         trackEvent('登录', '登录成功');
+        if (loginData.data.isNewUser === true) {
+          trackEvent('注册', '注册成功');
+        }
         // 保存 Token 到本地
         localStorage.setItem('token', loginData.data.token);
         
@@ -72,13 +75,12 @@ export default function Login() {
           avatarUrl: loginData.data.user.avatarUrl
         }));
         
-        // 跳转到首页或重定向地址
+        // 使用站内 SPA 跳转，保留登录与首次注册统计事件
         const { redirect } = router.query;
-        if (redirect) {
-          window.location.href = redirect;
-        } else {
-          window.location.href = '/';
-        }
+        const destination = typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')
+          ? redirect
+          : '/dashboard';
+        router.push(destination);
       } else {
         trackEvent('登录', '登录失败');
         setError(loginData.message || '邮箱或访问凭据错误，请重试');
@@ -96,6 +98,7 @@ export default function Login() {
     <div className={styles.container}>
       <Head>
         <title>欢迎登录 MarkFlow - 工程文档系统</title>
+        <meta name="robots" content="noindex,nofollow" />
       </Head>
 
       {/* Navbar */}

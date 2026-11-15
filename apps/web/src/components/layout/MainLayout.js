@@ -14,7 +14,8 @@ export const MainLayout = () => {
   return (
     <div className={styles.layout}>
       <Head>
-        <title>MarkFlow - Engineering Wiki</title>
+        <title>Markdown 工作台 - MarkFlow</title>
+        <meta name="robots" content="noindex,nofollow" />
       </Head>
 
       {/* Left Sidebar */}

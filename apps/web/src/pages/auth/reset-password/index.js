@@ -97,6 +97,7 @@ export default function ResetPassword() {
     <div className={styles.container}>
       <Head>
         <title>重设密码 - MarkFlow</title>
+        <meta name="robots" content="noindex,nofollow" />
       </Head>
 
       {/* Header */}
