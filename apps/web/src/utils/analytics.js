@@ -1,7 +1,7 @@
-const getDataLayer = () => {
+const getHmt = () => {
   if (typeof window === 'undefined') return null;
-  window.dataLayer = window.dataLayer || [];
-  return window.dataLayer;
+  window._hmt = window._hmt || [];
+  return window._hmt;
 };
 
 const getSafePagePath = (path) => {
@@ -10,21 +10,15 @@ const getSafePagePath = (path) => {
 };
 
 export const trackPageview = (path) => {
-  const dataLayer = getDataLayer();
-  if (dataLayer) {
-    dataLayer.push({ event: 'page_view', page_path: getSafePagePath(path) });
+  const hmt = getHmt();
+  if (hmt) {
+    hmt.push(['_trackPageview', getSafePagePath(path)]);
   }
 };
 
 export const trackEvent = (category, action, label = '') => {
-  const dataLayer = getDataLayer();
-  if (dataLayer) {
-    dataLayer.push({
-      event: 'markflow_event',
-      event_category: category,
-      event_action: action,
-      event_label: label,
-      page_path: getSafePagePath(window.location.pathname)
-    });
+  const hmt = getHmt();
+  if (hmt) {
+    hmt.push(['_trackEvent', category, action, label]);
   }
 };
